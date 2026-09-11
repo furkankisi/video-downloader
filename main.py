@@ -3,7 +3,6 @@ import uuid
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 import yt_dlp
 
 app = FastAPI(title="Video İndirici API")
@@ -16,16 +15,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class VideoRequest(BaseModel):
-    url: str
-    quality: str = "best"
-
 @app.get("/")
 def read_root():
     return {"status": "Video Downloader API çalışıyor kanka!"}
 
 @app.post("/get-info")
-async def get_info(request: VideoRequest):
+async def get_info(request: dict):
+    video_url = request.get("url")
+    if not video_url:
+        raise HTTPException(status_code=400, detail="URL bulunamadı.")
+        
     ydl_opts = {
         'quiet': True,
         'skip_download': True,
@@ -34,7 +33,7 @@ async def get_info(request: VideoRequest):
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(request.url, download=False)
+            info = ydl.extract_info(video_url, download=False)
             return {
                 "title": info.get("title", "İsimsiz Video"),
                 "thumbnail": info.get("thumbnail", ""),
@@ -44,10 +43,13 @@ async def get_info(request: VideoRequest):
         raise HTTPException(status_code=400, detail=f"Video bilgisi alınamadı: {str(e)}")
 
 @app.post("/download-video")
-async def download_video(request: VideoRequest):
-    quality = request.quality
+async def download_video(request: dict):
+    video_url = request.get("url")
+    quality = request.get("quality", "best")
     
-    # Instagram/TikTok veya en yüksek kalite seçimleri için en kararlı format
+    if not video_url:
+        raise HTTPException(status_code=400, detail="URL bulunamadı.")
+    
     if quality == "1080":
         format_str = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"
     elif quality == "720":
@@ -75,7 +77,7 @@ async def download_video(request: VideoRequest):
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([request.url])
+            ydl.download([video_url])
 
         downloaded_file = None
         for file in os.listdir("downloads"):
