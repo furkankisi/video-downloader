@@ -33,12 +33,14 @@ def get_platform_opts(url: str, is_info_only: bool = False):
         base_opts['skip_download'] = True
 
     if "instagram.com" in url:
-        # Instagram için iPhone maskesi ve direkt küçük mp4 çekimi
+        # Instagram için iPhone maskesi (Video boyutu ve QuickTime sorunu için)
         base_opts['user-agent'] = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
         if not is_info_only:
             base_opts['format'] = 'best[ext=mp4][vcodec^=avc1]/best'
     else:
-        # YouTube ve TikTok için sade ayar, bot korumasına takılmayan sağlam birleştirme
+        # YOUTUBE BOT KORUMASI KESİN BYPASS (Render IP engelini aşmak için Android İstemci Taklidi)
+        base_opts['extractor_args'] = {'youtube': ['player_client=android']}
+        
         if not is_info_only:
             base_opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
             base_opts['ffmpeg_location'] = FFMPEG_PATH
@@ -64,7 +66,7 @@ async def get_info(request: dict):
             }
     except Exception as e:
         print(f"BİLGİ HATASI: {str(e)}") 
-        raise HTTPException(status_code=400, detail="Video bilgisi alınamadı.")
+        raise HTTPException(status_code=400, detail=f"Video bilgisi alınamadı: {str(e)}")
 
 @app.post("/download-video")
 async def download_video(request: dict):
