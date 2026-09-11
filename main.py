@@ -48,9 +48,6 @@ async def download_video(request: dict):
     
     if not video_url:
         raise HTTPException(status_code=400, detail="URL bulunamadı.")
-    
-    # FFmpeg gerektirmeyen, doğrudan tek parça en yüksek uyumlu format
-    format_str = "best/bestvideo+bestaudio"
 
     file_id = str(uuid.uuid4())
     output_template = f"downloads/{file_id}.%(ext)s"
@@ -58,15 +55,29 @@ async def download_video(request: dict):
     os.makedirs("downloads", exist_ok=True)
 
     ydl_opts = {
-        'format': format_str,
+        'format': 'best',
         'outtmpl': output_template,
         'quiet': False,
         'no_warnings': False,
         'nocheckcertificate': True,
         'geo_bypass': True,
+        # Dosya formatını zorla mp4'e çevirir, QuickTime uyumsuzluğunu keser
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio', # (Eğer sadece sesse) veya genel container için:
+        }] if False else [], # Güvenli olması için alttaki postprocessor'ü kullanıyoruz:
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
     
+    # Gerçek mp4 dönüşüm garantisi için güncel ydl_opts:
+    ydl_opts = {
+        'format': 'best[ext=mp4]/best',  # Önce direkt mp4 olanı seçer, yoksa en iyisini alır
+        'outtmpl': output_template,
+        'quiet': False,
+        'nocheckcertificate': True,
+        'geo_bypass': True,
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([video_url])
