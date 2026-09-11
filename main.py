@@ -1,3 +1,6 @@
+@app.get("/")
+def read_root():
+    return {"status": "Video Downloader API çalışıyor kanka!"}
 import os
 import uuid
 from fastapi import FastAPI, HTTPException

@@ -8,7 +8,7 @@ export default function App() {
   const [isLoadingInfo, setIsLoadingInfo] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const API_BASE = 'http://127.0.0.1:8000';
+  const API_BASE = 'https://video-downloader-cvtw.onrender.com';
 
   const handlePaste = async () => {
     try {
