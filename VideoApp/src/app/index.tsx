@@ -4,7 +4,6 @@ import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator,
 export default function App() {
   const [url, setUrl] = useState('');
   const [videoInfo, setVideoInfo] = useState<{ title: string; thumbnail: string } | null>(null);
-  const [selectedQuality, setSelectedQuality] = useState('1080');
   const [isLoadingInfo, setIsLoadingInfo] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -58,7 +57,7 @@ export default function App() {
     }
   };
 
-  // 2. Adım: Seçilen kaliteyle videoyu indir
+  // 2. Adım: En yüksek kalitede videoyu indir
   const handleDownload = async () => {
     if (!url) return;
 
@@ -68,7 +67,7 @@ export default function App() {
       const response = await fetch(`${API_BASE}/download-video`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url, quality: selectedQuality }),
+        body: JSON.stringify({ url: url, quality: 'best' }),
       });
 
       if (!response.ok) {
@@ -80,13 +79,13 @@ export default function App() {
       
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = `video_${selectedQuality}p_${Date.now()}.mp4`;
+      a.download = `video_en_yuksek_kalite_${Date.now()}.mp4`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       
       window.URL.revokeObjectURL(downloadUrl);
-      Alert.alert("Başarılı! 🎉", "Video yüksek kalitede indirildi.");
+      Alert.alert("Başarılı! 🎉", "Video en yüksek kalitede indirildi.");
 
     } catch (error: any) {
       Alert.alert("İşlem Başarısız", error.message);
@@ -110,7 +109,7 @@ export default function App() {
         </View>
 
         <Text style={styles.title}>Video İndirici</Text>
-        <Text style={styles.subtitle}>Bağlantıyı yapıştır, önizlemeyi gör ve dilediğin kalitede indir.</Text>
+        <Text style={styles.subtitle}>Bağlantıyı yapıştır, önizlemeyi gör ve tek tıkla en yüksek kalitede indir.</Text>
         
         <View style={styles.inputContainer}>
           <TextInput
@@ -145,27 +144,12 @@ export default function App() {
           </TouchableOpacity>
         )}
 
-        {/* Video Bilgileri ve Kalite Seçimi (Geldikten Sonra Görünür) */}
+        {/* Video Bilgileri (Kalite Seçenekleri Kaldırıldı) */}
         {videoInfo && (
           <View style={styles.previewContainer}>
             <View style={styles.videoInfoBox}>
               <Image source={{ uri: videoInfo.thumbnail }} style={styles.thumbnail} />
               <Text style={styles.videoTitle} numberOfLines={2}>{videoInfo.title}</Text>
-            </View>
-
-            <Text style={styles.qualityLabel}>Kalite Seçin:</Text>
-            <View style={styles.qualityRow}>
-              {['1080', '720', '480', 'best'].map((q) => (
-                <TouchableOpacity
-                  key={q}
-                  style={[styles.qualityBtn, selectedQuality === q && styles.qualityBtnActive]}
-                  onPress={() => setSelectedQuality(q)}
-                >
-                  <Text style={[styles.qualityText, selectedQuality === q && styles.qualityTextActive]}>
-                    {q === 'best' ? 'En İyi' : `${q}p`}
-                  </Text>
-                </TouchableOpacity>
-              ))}
             </View>
 
             <TouchableOpacity 
@@ -179,7 +163,7 @@ export default function App() {
                   <Text style={styles.buttonText}>İndiriliyor...</Text>
                 </View>
               ) : (
-                <Text style={styles.buttonText}>Seçilen Kalitede İndir 🚀</Text>
+                <Text style={styles.buttonText}>En Yüksek Kalitede İndir 🚀</Text>
               )}
             </TouchableOpacity>
 
@@ -219,12 +203,6 @@ const styles = StyleSheet.create({
   videoInfoBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: 12, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
   thumbnail: { width: 75, height: 75, borderRadius: 8, backgroundColor: '#334155', marginRight: 12 },
   videoTitle: { flex: 1, color: '#f8fafc', fontSize: 14, fontWeight: '600', lineHeight: 18 },
-  qualityLabel: { color: '#94a3b8', fontSize: 13, fontWeight: '600', marginBottom: 8 },
-  qualityRow: { flexDirection: 'row', gap: 8, marginBottom: 15 },
-  qualityBtn: { flex: 1, paddingVertical: 10, backgroundColor: 'rgba(15, 23, 42, 0.8)', borderRadius: 10, borderWidth: 1, borderColor: '#334155', alignItems: 'center' },
-  qualityBtnActive: { backgroundColor: '#6366f1', borderColor: '#818cf8' },
-  qualityText: { color: '#94a3b8', fontSize: 13, fontWeight: '600' },
-  qualityTextActive: { color: '#fff' },
-  resetBtn: { marginTop: 12, alignItems: 'center' },
+  resetBtn: { marginTop: 15, alignItems: 'center' },
   resetText: { color: '#94a3b8', fontSize: 12, textDecorationLine: 'underline' }
 });
