@@ -26,7 +26,7 @@ class VideoRequest(BaseModel):
 @app.post("/get-info")
 async def get_info(request: VideoRequest):
     ydl_opts = {
-    'format': 'bestvideo+bestaudio/best',  # En iyi video ve sesi otomatik birleştirir
+    'format': 'best',  # En iyi tekli formatı seçer, ayrı ayrı indirip birleştirmeye çalışmaz (bozuk dosya riskini sıfırlar)
     'noplaylist': True,
     'quiet': True,
     'nocheckcertificate': True
