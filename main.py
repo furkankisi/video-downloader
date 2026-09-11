@@ -1,6 +1,3 @@
-@app.get("/")
-def read_root():
-    return {"status": "Video Downloader API çalışıyor kanka!"}
 import os
 import uuid
 from fastapi import FastAPI, HTTPException
@@ -23,14 +20,18 @@ class VideoRequest(BaseModel):
     url: str
     quality: str = "best"
 
+@app.get("/")
+def read_root():
+    return {"status": "Video Downloader API çalışıyor kanka!"}
+
 @app.post("/get-info")
 async def get_info(request: VideoRequest):
     ydl_opts = {
-    'format': 'best',  # En iyi tekli formatı seçer, ayrı ayrı indirip birleştirmeye çalışmaz (bozuk dosya riskini sıfırlar)
-    'noplaylist': True,
-    'quiet': True,
-    'nocheckcertificate': True
-}
+        'quiet': True,
+        'skip_download': True,
+        'nocheckcertificate': True,
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
@@ -46,14 +47,15 @@ async def get_info(request: VideoRequest):
 async def download_video(request: VideoRequest):
     quality = request.quality
     
+    # Instagram/TikTok veya en yüksek kalite seçimleri için en kararlı format
     if quality == "1080":
-        format_str = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/bv*[height<=1080]+ba/b[height<=1080]"
+        format_str = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"
     elif quality == "720":
-        format_str = "bestvideo[height<=720]+bestaudio/best[height<=720]/bv*[height<=720]+ba/b[height<=720]"
+        format_str = "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
     elif quality == "480":
-        format_str = "bestvideo[height<=480]+bestaudio/best[height<=480]/bv*[height<=480]+ba/b[height<=480]"
+        format_str = "bestvideo[height<=480]+bestaudio/best[height<=480]/best"
     else:
-        format_str = "bestvideo+bestaudio/best/bv*+ba/b"
+        format_str = "bestvideo+bestaudio/best"
 
     file_id = str(uuid.uuid4())
     output_template = f"downloads/{file_id}.%(ext)s"
@@ -64,14 +66,13 @@ async def download_video(request: VideoRequest):
         'format': format_str,
         'outtmpl': output_template,
         'merge_output_format': 'mp4',
-        'ffmpeg_location': '/opt/homebrew/bin/ffmpeg',
         'quiet': False,
         'no_warnings': False,
         'nocheckcertificate': True,
         'geo_bypass': True,
-        # Hiçbir ekstra player_client zorlaması yapmıyoruz, yt-dlp kendi en güncel akıllı seçimiyle yakalasın:
-        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
+    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([request.url])
@@ -89,12 +90,12 @@ async def download_video(request: VideoRequest):
                     break
 
         if not downloaded_file or not os.path.exists(downloaded_file):
-            raise HTTPException(status_code=400, detail="Video birleştirilemedi.")
+            raise HTTPException(status_code=400, detail="Video indirilemedi veya birleştirilemedi.")
 
         return FileResponse(
             downloaded_file, 
             media_type="video/mp4", 
-            filename=f"video_{quality}p.mp4"
+            filename=f"video_indirildi.mp4"
         )
 
     except Exception as e:
