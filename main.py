@@ -4,7 +4,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import yt_dlp
-import imageio_ffmpeg
 
 app = FastAPI(title="Video İndirici API")
 
@@ -55,18 +54,10 @@ async def download_video(request: dict):
     
     os.makedirs("downloads", exist_ok=True)
 
-    # Python içi ffmpeg yolunu alıyoruz
-    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-
-    # Videoyu indirip doğrudan QuickTime uyumlu temiz mp4'e çeviren ayar
+    # QuickTime'ın kesin açtığı H.264 (avc1) codec'ini ve mp4 uzantısını ZORLUYORUZ
     ydl_opts = {
-        'format': 'best',
+        'format': 'best[vcodec^=avc1][ext=mp4]/best[ext=mp4]/best',
         'outtmpl': output_template,
-        'ffmpeg_location': ffmpeg_path,
-        'postprocessors': [{
-            'key': 'FFmpegVideoConvertor',
-            'preferedformat': 'mp4',
-        }],
         'quiet': False,
         'nocheckcertificate': True,
         'geo_bypass': True,
@@ -79,15 +70,9 @@ async def download_video(request: dict):
 
         downloaded_file = None
         for file in os.listdir("downloads"):
-            if file.startswith(file_id) and file.endswith(".mp4"):
+            if file.startswith(file_id):
                 downloaded_file = os.path.join("downloads", file)
                 break
-
-        if not downloaded_file:
-            for file in os.listdir("downloads"):
-                if file.startswith(file_id):
-                    downloaded_file = os.path.join("downloads", file)
-                    break
 
         if not downloaded_file or not os.path.exists(downloaded_file):
             raise HTTPException(status_code=400, detail="Video indirilemedi.")
