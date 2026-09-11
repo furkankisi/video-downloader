@@ -13,9 +13,13 @@ except Exception:
 
 app = FastAPI(title="Video İndirici API")
 
+# CORS çakışmasını önlemek için Vercel linkini doğrudan verdik
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://video-downloader-ten-theta.vercel.app",
+        "http://localhost:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,7 +35,6 @@ async def get_info(request: dict):
     if not video_url:
         raise HTTPException(status_code=400, detail="URL bulunamadı.")
         
-    # YouTube'un 400 hatası vermesini engelleyen tam teşekküllü tarayıcı maskesi
     ydl_opts = {
         'quiet': True,
         'skip_download': True,
