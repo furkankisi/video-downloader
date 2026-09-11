@@ -1,6 +1,5 @@
 fastapi
 uvicorn
-yt-dlp
+yt-dlp>=2024.08.06
 imageio-ffmpeg
 pydantic
-requests

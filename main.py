@@ -31,12 +31,18 @@ async def get_info(request: dict):
     if not video_url:
         raise HTTPException(status_code=400, detail="URL bulunamadı.")
         
-    # YouTube'un engellememesi için User-Agent maskesi kaldırıldı, sade ayarlar kullanılıyor
+    # YouTube'un 400 hatası vermesini engelleyen tam teşekküllü tarayıcı maskesi
     ydl_opts = {
         'quiet': True,
         'skip_download': True,
-        'no_warnings': True,
-        'nocheckcertificate': True
+        'nocheckcertificate': True,
+        'extract_flat': False,
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'http_headers': {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Sec-Fetch-Mode': 'navigate',
+        }
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -48,7 +54,7 @@ async def get_info(request: dict):
             }
     except Exception as e:
         print(f"YOUTUBE BİLGİ HATASI: {str(e)}") 
-        raise HTTPException(status_code=400, detail="Video bilgisi alınamadı, linki kontrol et.")
+        raise HTTPException(status_code=400, detail=f"Video bilgisi alınamadı: {str(e)}")
 
 @app.post("/download-video")
 async def download_video(request: dict):
