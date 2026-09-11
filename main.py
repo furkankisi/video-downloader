@@ -54,30 +54,16 @@ async def download_video(request: dict):
     
     os.makedirs("downloads", exist_ok=True)
 
+    # FFmpeg gerektirmeyen, tüm platformlarda tek parça ve hızlı indirme sağlayan ayar
     ydl_opts = {
         'format': 'best',
         'outtmpl': output_template,
         'quiet': False,
-        'no_warnings': False,
         'nocheckcertificate': True,
         'geo_bypass': True,
-        # Dosya formatını zorla mp4'e çevirir, QuickTime uyumsuzluğunu keser
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio', # (Eğer sadece sesse) veya genel container için:
-        }] if False else [], # Güvenli olması için alttaki postprocessor'ü kullanıyoruz:
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
     
-    # Gerçek mp4 dönüşüm garantisi için güncel ydl_opts:
-    ydl_opts = {
-        'format': 'best[ext=mp4]/best',  # Önce direkt mp4 olanı seçer, yoksa en iyisini alır
-        'outtmpl': output_template,
-        'quiet': False,
-        'nocheckcertificate': True,
-        'geo_bypass': True,
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    }
-
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([video_url])
