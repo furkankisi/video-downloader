@@ -5,7 +5,6 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import yt_dlp
 
-# FFmpeg yolunu garantiye alıyoruz
 try:
     import imageio_ffmpeg
     FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
@@ -32,11 +31,12 @@ async def get_info(request: dict):
     if not video_url:
         raise HTTPException(status_code=400, detail="URL bulunamadı.")
         
+    # YouTube'un engellememesi için User-Agent maskesi kaldırıldı, sade ayarlar kullanılıyor
     ydl_opts = {
         'quiet': True,
         'skip_download': True,
-        'nocheckcertificate': True,
-        'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+        'no_warnings': True,
+        'nocheckcertificate': True
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -47,7 +47,8 @@ async def get_info(request: dict):
                 "duration": info.get("duration", 0)
             }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Video bilgisi alınamadı: {str(e)}")
+        print(f"YOUTUBE BİLGİ HATASI: {str(e)}") 
+        raise HTTPException(status_code=400, detail="Video bilgisi alınamadı, linki kontrol et.")
 
 @app.post("/download-video")
 async def download_video(request: dict):
@@ -61,18 +62,14 @@ async def download_video(request: dict):
     
     os.makedirs("downloads", exist_ok=True)
 
-    # İŞTE BÜYÜ BURADA:
-    # 1. iPhone User-Agent ile Instagram'ı kandırıyoruz (küçük ve uyumlu dosya veriyor)
-    # 2. Sadece ve sadece H.264 (avc1) ve mp4 formatını kabul etmeye zorluyoruz
     ydl_opts = {
-        'format': 'bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4][vcodec^=avc1]/best[ext=mp4]/best',
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': output_template,
         'ffmpeg_location': FFMPEG_PATH,
         'merge_output_format': 'mp4',
         'quiet': False,
         'nocheckcertificate': True,
-        'geo_bypass': True,
-        'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+        'geo_bypass': True
     }
     
     try:
