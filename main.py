@@ -21,32 +21,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def get_platform_opts(url: str, is_info_only: bool = False):
-    """Platforma göre yt-dlp ayarlarını akıllıca ayırır"""
-    base_opts = {
-        'quiet': True,
-        'nocheckcertificate': True,
-        'geo_bypass': True
-    }
-    
-    if is_info_only:
-        base_opts['skip_download'] = True
-
-    if "instagram.com" in url:
-        # Instagram için iPhone maskesi (Video boyutu ve QuickTime sorunu için)
-        base_opts['user-agent'] = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
-        if not is_info_only:
-            base_opts['format'] = 'best[ext=mp4][vcodec^=avc1]/best'
-    else:
-        # YOUTUBE BOT KORUMASI KESİN BYPASS (Render IP engelini aşmak için Android İstemci Taklidi)
-        base_opts['extractor_args'] = {'youtube': ['player_client=android']}
-        
-        if not is_info_only:
-            base_opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
-            base_opts['ffmpeg_location'] = FFMPEG_PATH
-            base_opts['merge_output_format'] = 'mp4'
-            
-    return base_opts
+@app.get("/")
+def read_root():
+    return {"status": "Video Downloader API Instagram ve TikTok için aktif kanka!"}
 
 @app.post("/get-info")
 async def get_info(request: dict):
@@ -54,7 +31,13 @@ async def get_info(request: dict):
     if not video_url:
         raise HTTPException(status_code=400, detail="URL bulunamadı.")
         
-    ydl_opts = get_platform_opts(video_url, is_info_only=True)
+    ydl_opts = {
+        'quiet': True,
+        'skip_download': True,
+        'nocheckcertificate': True,
+        'geo_bypass': True,
+        'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+    }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -66,7 +49,7 @@ async def get_info(request: dict):
             }
     except Exception as e:
         print(f"BİLGİ HATASI: {str(e)}") 
-        raise HTTPException(status_code=400, detail=f"Video bilgisi alınamadı: {str(e)}")
+        raise HTTPException(status_code=400, detail="Video bilgisi alınamadı, linki kontrol et.")
 
 @app.post("/download-video")
 async def download_video(request: dict):
@@ -75,10 +58,18 @@ async def download_video(request: dict):
         raise HTTPException(status_code=400, detail="URL bulunamadı.")
 
     file_id = str(uuid.uuid4())
-    ydl_opts = get_platform_opts(video_url, is_info_only=False)
-    ydl_opts['outtmpl'] = f"downloads/{file_id}.%(ext)s"
-    
+    output_template = f"downloads/{file_id}.%(ext)s"
     os.makedirs("downloads", exist_ok=True)
+    
+    # Instagram ve TikTok için uyumlu, küçük boyutlu, QuickTime dostu format
+    ydl_opts = {
+        'format': 'best[ext=mp4][vcodec^=avc1]/best',
+        'outtmpl': output_template,
+        'quiet': False,
+        'nocheckcertificate': True,
+        'geo_bypass': True,
+        'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+    }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
