@@ -54,9 +54,9 @@ async def download_video(request: dict):
     
     os.makedirs("downloads", exist_ok=True)
 
-    # FFmpeg hiç gerektirmeyen, doğrudan tek parça (pre-muxed) mp4 formatını seçen en temiz ayar
+    # Instagram ve diğer platformlar için en kararlı, zorlamasız doğal indirme ayarı
     ydl_opts = {
-        'format': 'best[ext=mp4]/best',
+        'format': 'best',
         'outtmpl': output_template,
         'quiet': False,
         'nocheckcertificate': True,
