@@ -5,6 +5,13 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import yt_dlp
 
+# FFmpeg yolunu garantiye alıyoruz
+try:
+    import imageio_ffmpeg
+    FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
+except Exception:
+    FFMPEG_PATH = 'ffmpeg'
+
 app = FastAPI(title="Video İndirici API")
 
 app.add_middleware(
@@ -29,7 +36,7 @@ async def get_info(request: dict):
         'quiet': True,
         'skip_download': True,
         'nocheckcertificate': True,
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -54,14 +61,18 @@ async def download_video(request: dict):
     
     os.makedirs("downloads", exist_ok=True)
 
-    # QuickTime'ın kesin açtığı H.264 (avc1) codec'ini ve mp4 uzantısını ZORLUYORUZ
+    # İŞTE BÜYÜ BURADA:
+    # 1. iPhone User-Agent ile Instagram'ı kandırıyoruz (küçük ve uyumlu dosya veriyor)
+    # 2. Sadece ve sadece H.264 (avc1) ve mp4 formatını kabul etmeye zorluyoruz
     ydl_opts = {
-        'format': 'best[vcodec^=avc1][ext=mp4]/best[ext=mp4]/best',
+        'format': 'bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4][vcodec^=avc1]/best[ext=mp4]/best',
         'outtmpl': output_template,
+        'ffmpeg_location': FFMPEG_PATH,
+        'merge_output_format': 'mp4',
         'quiet': False,
         'nocheckcertificate': True,
         'geo_bypass': True,
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
     }
     
     try:
@@ -70,9 +81,15 @@ async def download_video(request: dict):
 
         downloaded_file = None
         for file in os.listdir("downloads"):
-            if file.startswith(file_id):
+            if file.startswith(file_id) and file.endswith(".mp4"):
                 downloaded_file = os.path.join("downloads", file)
                 break
+
+        if not downloaded_file:
+            for file in os.listdir("downloads"):
+                if file.startswith(file_id):
+                    downloaded_file = os.path.join("downloads", file)
+                    break
 
         if not downloaded_file or not os.path.exists(downloaded_file):
             raise HTTPException(status_code=400, detail="Video indirilemedi.")
@@ -80,7 +97,7 @@ async def download_video(request: dict):
         return FileResponse(
             downloaded_file, 
             media_type="video/mp4", 
-            filename=f"video_indirildi.mp4"
+            filename="video_indirildi.mp4"
         )
 
     except Exception as e:
