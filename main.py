@@ -45,19 +45,12 @@ async def get_info(request: dict):
 @app.post("/download-video")
 async def download_video(request: dict):
     video_url = request.get("url")
-    quality = request.get("quality", "best")
     
     if not video_url:
         raise HTTPException(status_code=400, detail="URL bulunamadı.")
     
-    if quality == "1080":
-        format_str = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"
-    elif quality == "720":
-        format_str = "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
-    elif quality == "480":
-        format_str = "bestvideo[height<=480]+bestaudio/best[height<=480]/best"
-    else:
-        format_str = "bestvideo+bestaudio/best"
+    # FFmpeg gerektirmeyen, doğrudan tek parça en yüksek uyumlu format
+    format_str = "best/bestvideo+bestaudio"
 
     file_id = str(uuid.uuid4())
     output_template = f"downloads/{file_id}.%(ext)s"
@@ -67,7 +60,6 @@ async def download_video(request: dict):
     ydl_opts = {
         'format': format_str,
         'outtmpl': output_template,
-        'merge_output_format': 'mp4',
         'quiet': False,
         'no_warnings': False,
         'nocheckcertificate': True,
@@ -81,18 +73,12 @@ async def download_video(request: dict):
 
         downloaded_file = None
         for file in os.listdir("downloads"):
-            if file.startswith(file_id) and file.endswith(".mp4"):
+            if file.startswith(file_id):
                 downloaded_file = os.path.join("downloads", file)
                 break
 
-        if not downloaded_file:
-            for file in os.listdir("downloads"):
-                if file.startswith(file_id):
-                    downloaded_file = os.path.join("downloads", file)
-                    break
-
         if not downloaded_file or not os.path.exists(downloaded_file):
-            raise HTTPException(status_code=400, detail="Video indirilemedi veya birleştirilemedi.")
+            raise HTTPException(status_code=400, detail="Video indirilemedi.")
 
         return FileResponse(
             downloaded_file, 
