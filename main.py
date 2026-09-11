@@ -26,12 +26,11 @@ class VideoRequest(BaseModel):
 @app.post("/get-info")
 async def get_info(request: VideoRequest):
     ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'nocheckcertificate': True,
-        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-    }
+    'format': 'bestvideo+bestaudio/best',  # En iyi video ve sesi otomatik birleştirir
+    'noplaylist': True,
+    'quiet': True,
+    'nocheckcertificate': True
+}
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
