@@ -4,7 +4,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import yt_dlp
-import imageio_ffmpeg
 
 app = FastAPI(title="Video İndirici API")
 
@@ -55,14 +54,10 @@ async def download_video(request: dict):
     
     os.makedirs("downloads", exist_ok=True)
 
-    # imageio_ffmpeg sayesinde sunucuda harici ffmpeg olmasa bile python içi tam birleştirme yapar
-    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-
+    # FFmpeg hiç gerektirmeyen, doğrudan tek parça (pre-muxed) mp4 formatını seçen en temiz ayar
     ydl_opts = {
-        'format': 'bestvideo+bestaudio/best',
+        'format': 'best[ext=mp4]/best',
         'outtmpl': output_template,
-        'merge_output_format': 'mp4',
-        'ffmpeg_location': ffmpeg_path,
         'quiet': False,
         'nocheckcertificate': True,
         'geo_bypass': True,
@@ -75,18 +70,12 @@ async def download_video(request: dict):
 
         downloaded_file = None
         for file in os.listdir("downloads"):
-            if file.startswith(file_id) and file.endswith(".mp4"):
+            if file.startswith(file_id):
                 downloaded_file = os.path.join("downloads", file)
                 break
 
-        if not downloaded_file:
-            for file in os.listdir("downloads"):
-                if file.startswith(file_id):
-                    downloaded_file = os.path.join("downloads", file)
-                    break
-
         if not downloaded_file or not os.path.exists(downloaded_file):
-            raise HTTPException(status_code=400, detail="Video indirilemedi veya birleştirilemedi.")
+            raise HTTPException(status_code=400, detail="Video indirilemedi.")
 
         return FileResponse(
             downloaded_file, 
