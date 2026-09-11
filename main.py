@@ -54,9 +54,9 @@ async def download_video(request: dict):
     
     os.makedirs("downloads", exist_ok=True)
 
-    # Instagram ve diğer platformlar için en kararlı, zorlamasız doğal indirme ayarı
+    # Dosya boyutunu devasa şişirmeyen, optimize web kalitesini seçen akıllı format ayarı
     ydl_opts = {
-        'format': 'best',
+        'format': 'best[height<=720]/best[ext=mp4]/best',
         'outtmpl': output_template,
         'quiet': False,
         'nocheckcertificate': True,
