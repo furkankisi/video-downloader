@@ -54,10 +54,14 @@ async def download_video(request: dict):
     
     os.makedirs("downloads", exist_ok=True)
 
-    # FFmpeg gerektirmeyen, tüm platformlarda tek parça ve hızlı indirme sağlayan ayar
+    # mp4 uzantısını ve formatını zorlayan en keskin ayar
     ydl_opts = {
         'format': 'best',
         'outtmpl': output_template,
+        'postprocessors': [{
+            'key': 'FFmpegVideoConvertor',
+            'preferedformat': 'mp4',
+        }],
         'quiet': False,
         'nocheckcertificate': True,
         'geo_bypass': True,
