@@ -66,7 +66,9 @@ async def download_video(request: VideoRequest):
     
     ydl_opts = base_ydl_opts.copy()
     ydl_opts.update({
-        'format': 'best', # Orijinal kalite
+        # Görüntü ve sesi alıp MP4 olarak birleştirir, bulamazsa en iyi tek parçayı alır
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
+        'merge_output_format': 'mp4',
         'outtmpl': output_template,
     })
     
