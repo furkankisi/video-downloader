@@ -2,3 +2,5 @@ downloads/
 downloads/
 downloads/
 venv/
+.vercel
+.env*

@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert, Image, Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
 
 export default function App() {
   const [url, setUrl] = useState('');
@@ -7,31 +10,24 @@ export default function App() {
   const [isLoadingInfo, setIsLoadingInfo] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const API_BASE = 'https://video-downloader-cvtw.onrender.com';
+  // const API_BASE = 'http://127.0.0.1:8000'; // BUNU SİL VEYA YORUMA AL
+const API_BASE = 'https://video-downloader-cvtw.onrender.com'; // CANLI RENDER ADRESİN
 
   const handlePaste = async () => {
     try {
-      const text = await navigator.clipboard.readText();
-      if (text) {
-        setUrl(text);
-      } else {
-        Alert.alert("Bilgi", "Pano boş.");
-      }
+      const text = await Clipboard.getStringAsync();
+      if (text) setUrl(text);
     } catch (error) {
-      Alert.alert("Hata", "Panodan yazı okunamadı.");
+      Alert.alert("Hata", "Panodan kopyalanamadı.");
     }
   };
 
-  // 1. Adım: Videonun bilgilerini (resim ve başlık) getir
   const handleFetchInfo = async () => {
-    if (!url) {
-      Alert.alert("Eksik Link", "Lütfen bir video linki yapıştırın.");
-      return;
-    }
-
+    if (!url) return Alert.alert("Hata", "Lütfen bir link girin.");
+    
     setIsLoadingInfo(true);
     setVideoInfo(null);
-
+    
     try {
       const response = await fetch(`${API_BASE}/get-info`, {
         method: 'POST',
@@ -40,16 +36,9 @@ export default function App() {
       });
 
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Video bilgileri alınamadı.");
-      }
-
-      setVideoInfo({
-        title: data.title,
-        thumbnail: data.thumbnail
-      });
-
+      if (!response.ok) throw new Error(data.detail || "Video bulunamadı.");
+      
+      setVideoInfo({ title: data.title, thumbnail: data.thumbnail });
     } catch (error: any) {
       Alert.alert("Hata", error.message);
     } finally {
@@ -57,38 +46,57 @@ export default function App() {
     }
   };
 
-  // 2. Adım: En yüksek kalitede videoyu indir
   const handleDownload = async () => {
     if (!url) return;
-
     setIsDownloading(true);
 
     try {
-      const response = await fetch(`${API_BASE}/download-video`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url, quality: 'best' }),
-      });
+      if (Platform.OS === 'web') {
+        const response = await fetch(`${API_BASE}/download-video`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: url }),
+        });
+        
+        if (!response.ok) throw new Error("İndirme başarısız.");
+        
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `video_${Date.now()}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(blobUrl);
+      } else {
+        const dir = (FileSystem as any).documentDirectory || 'file:///var/mobile/';
+        const fileUri = `${dir}video_${Date.now()}.mp4`;
 
-      if (!response.ok) {
-        throw new Error("Video indirilemedi.");
+        // TypeScript'i susturan kesin çözüm
+        const downloadOptions: any = {
+          httpMethod: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: url }),
+        };
+
+        const downloadResumable = FileSystem.createDownloadResumable(
+          `${API_BASE}/download-video`,
+          fileUri,
+          downloadOptions
+        );
+
+        const result = await downloadResumable.downloadAsync();
+        
+        if (result && result.uri) {
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(result.uri);
+          }
+        }
       }
-
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = `video_en_yuksek_kalite_${Date.now()}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      
-      window.URL.revokeObjectURL(downloadUrl);
-      Alert.alert("Başarılı! 🎉", "Video en yüksek kalitede indirildi.");
-
-    } catch (error: any) {
-      Alert.alert("İşlem Başarısız", error.message);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Hata", "Video indirilirken bir sorun oluştu.");
     } finally {
       setIsDownloading(false);
     }
@@ -96,37 +104,23 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.ellipseTop} />
-      <View style={styles.ellipseBottom} />
-
       <View style={styles.card}>
-        <View style={styles.platformsContainer}>
-          <View style={styles.platformBadge}><Text style={styles.platformText}>📸 Instagram</Text></View>
-          <Text style={styles.arrowText}>➔</Text>
-          <View style={styles.platformBadge}><Text style={styles.platformText}>🎵 TikTok</Text></View>
-          <Text style={styles.arrowText}>➔</Text>
-          <View style={styles.platformBadge}><Text style={styles.platformText}>▶️ YouTube</Text></View>
-        </View>
-
         <Text style={styles.title}>Video İndirici</Text>
         <Text style={styles.subtitle}>Bağlantıyı yapıştır, önizlemeyi gör ve tek tıkla en yüksek kalitede indir.</Text>
-        
+
         <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Video bağlantısını buraya yapıştırın..."
-            placeholderTextColor="#64748b"
+          <TextInput 
+            style={styles.input} 
+            placeholder="Video bağlantısını yapıştır..." 
+            placeholderTextColor="#94a3b8"
             value={url}
             onChangeText={setUrl}
-            autoCapitalize="none"
-            autoCorrect={false}
           />
           <TouchableOpacity style={styles.pasteButton} onPress={handlePaste}>
-            <Text style={styles.pasteButtonText}>📋 Yapıştır</Text>
+            <Text style={styles.pasteButtonText}>Yapıştır</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Videoyu Getir Butonu */}
         {!videoInfo && (
           <TouchableOpacity 
             style={[styles.button, isLoadingInfo && styles.buttonDisabled]} 
@@ -144,11 +138,12 @@ export default function App() {
           </TouchableOpacity>
         )}
 
-        {/* Video Bilgileri (Kalite Seçenekleri Kaldırıldı) */}
         {videoInfo && (
           <View style={styles.previewContainer}>
             <View style={styles.videoInfoBox}>
-              <Image source={{ uri: videoInfo.thumbnail }} style={styles.thumbnail} />
+              {videoInfo.thumbnail ? (
+                <Image source={{ uri: videoInfo.thumbnail }} style={styles.thumbnail} />
+              ) : null}
               <Text style={styles.videoTitle} numberOfLines={2}>{videoInfo.title}</Text>
             </View>
 
@@ -181,28 +176,22 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#090d16', padding: 20, overflow: 'hidden', position: 'relative' },
-  ellipseTop: { position: 'absolute', top: -100, left: -100, width: 400, height: 400, borderRadius: 200, backgroundColor: '#6366f1', opacity: 0.25, filter: 'blur(80px)' } as any,
-  ellipseBottom: { position: 'absolute', bottom: -100, right: -100, width: 450, height: 450, borderRadius: 225, backgroundColor: '#ec4899', opacity: 0.2, filter: 'blur(90px)' } as any,
-  card: { width: '100%', maxWidth: 500, backgroundColor: 'rgba(30, 41, 59, 0.75)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)', padding: 35, borderRadius: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.4, shadowRadius: 30, elevation: 15, backdropFilter: 'blur(16px)' } as any,
-  platformsContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 8 },
-  platformBadge: { backgroundColor: 'rgba(15, 23, 42, 0.6)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)' },
-  platformText: { color: '#cbd5e1', fontSize: 12, fontWeight: '600' },
-  arrowText: { color: '#6366f1', fontSize: 14, fontWeight: 'bold' },
-  title: { fontSize: 26, fontWeight: '800', color: '#f8fafc', letterSpacing: -0.5, marginBottom: 8, textAlign: 'center' },
-  subtitle: { fontSize: 13, color: '#94a3b8', lineHeight: 18, marginBottom: 20, textAlign: 'center' },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#090d16', padding: 20 },
+  card: { width: '100%', maxWidth: 500, backgroundColor: 'rgba(30, 41, 59, 0.95)', padding: 30, borderRadius: 20, borderWidth: 1, borderColor: '#334155' },
+  title: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginBottom: 5, textAlign: 'center' },
+  subtitle: { fontSize: 13, color: '#94a3b8', marginBottom: 20, textAlign: 'center' },
   inputContainer: { position: 'relative', marginBottom: 15 },
-  input: { backgroundColor: 'rgba(15, 23, 42, 0.8)', padding: 16, paddingRight: 95, borderRadius: 14, borderWidth: 1.5, borderColor: '#334155', color: '#fff', fontSize: 15 },
-  pasteButton: { position: 'absolute', right: 8, top: 8, bottom: 8, backgroundColor: '#334155', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10 },
-  pasteButtonText: { color: '#e2e8f0', fontSize: 13, fontWeight: '600' },
-  button: { backgroundColor: '#6366f1', padding: 16, borderRadius: 14, alignItems: 'center', shadowColor: '#6366f1', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 12, marginTop: 5 },
-  buttonDisabled: { backgroundColor: '#4338ca', opacity: 0.7 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold', letterSpacing: 0.5 },
+  input: { backgroundColor: '#0f172a', color: '#fff', padding: 15, paddingRight: 80, borderRadius: 10, borderWidth: 1, borderColor: '#334155' },
+  pasteButton: { position: 'absolute', right: 5, top: 5, bottom: 5, backgroundColor: '#334155', justifyContent: 'center', paddingHorizontal: 15, borderRadius: 8 },
+  pasteButtonText: { color: '#fff', fontWeight: 'bold' },
+  button: { backgroundColor: '#6366f1', padding: 15, borderRadius: 10, alignItems: 'center' },
+  buttonDisabled: { opacity: 0.7 },
+  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   loadingRow: { flexDirection: 'row', alignItems: 'center' },
   previewContainer: { marginTop: 10 },
-  videoInfoBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.6)', padding: 12, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
-  thumbnail: { width: 75, height: 75, borderRadius: 8, backgroundColor: '#334155', marginRight: 12 },
-  videoTitle: { flex: 1, color: '#f8fafc', fontSize: 14, fontWeight: '600', lineHeight: 18 },
+  videoInfoBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f172a', padding: 10, borderRadius: 10, marginBottom: 15 },
+  thumbnail: { width: 60, height: 60, borderRadius: 8, marginRight: 10, backgroundColor: '#334155' },
+  videoTitle: { flex: 1, color: '#fff', fontSize: 14 },
   resetBtn: { marginTop: 15, alignItems: 'center' },
-  resetText: { color: '#94a3b8', fontSize: 12, textDecorationLine: 'underline' }
+  resetText: { color: '#94a3b8', textDecorationLine: 'underline' }
 });
