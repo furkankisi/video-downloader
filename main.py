@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import yt_dlp
 
-app = FastAPI(title="Sadece Instagram İndirici")
+app = FastAPI(title="Sadece Instagram İndirici (Sesli)")
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,17 +21,14 @@ class VideoRequest(BaseModel):
     url: str
 
 def clean_ig_url(url: str):
-    # Instagram linkinin sonundaki gereksiz takip çöplerini temizler
     if "?" in url:
         return url.split("?")[0]
     return url
 
-# SADECE INSTAGRAM İÇİN ÖZEL AYAR
 base_ydl_opts = {
     'quiet': True,
     'no_warnings': True,
     'nocheckcertificate': True,
-    'extractor_args': {'instagram': {'api': ['graphql']}}, # Instagram'a direkt erişim
     'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
 }
 
@@ -56,13 +53,13 @@ async def download_video(request: VideoRequest):
     clean_link = clean_ig_url(request.url)
     file_id = str(uuid.uuid4())
     os.makedirs("downloads", exist_ok=True)
-    output_template = f"downloads/{file_id}.mp4"
+    output_template = f"downloads/{file_id}.%(ext)s"
     
     ydl_opts = base_ydl_opts.copy()
     ydl_opts.update({
-        # INSTAGRAM İÇİN KESİN ÇÖZÜM: 
-        # Birleştirme yapma, Instagram'ın kendinden sesli orijinal MP4 dosyasını direkt al.
-        'format': 'best[ext=mp4]/best', 
+        # İŞTE BÜTÜN SORUNU ÇÖZEN O SİHİRLİ KOD:
+        # "İçinde hem ses (acodec) hem görüntü (vcodec) olan EN İYİ tek dosyayı ver"
+        'format': 'best[vcodec!=none][acodec!=none]', 
         'outtmpl': output_template,
     })
     
