@@ -7,6 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import yt_dlp
 
+# --- SES BİRLEŞTİRİCİ GİZLİ SİLAH ---
+import imageio_ffmpeg
+ffmpeg_korsan_yol = imageio_ffmpeg.get_ffmpeg_exe()
+# -----------------------------------
+
 app = FastAPI(title="Video İndirici API")
 
 app.add_middleware(
@@ -20,31 +25,27 @@ app.add_middleware(
 class VideoRequest(BaseModel):
     url: str
 
-# 1. HAMLE: Instagram linklerindeki bozucu uzantıları otomatik kesip atıyoruz
 def clean_url(url: str):
     if "instagram.com" in url and "?" in url:
         return url.split("?")[0]
     return url
 
-# 2. HAMLE: Maksimum hız ve Instagram'a yakalanmamak için özel ayarlar
 base_ydl_opts = {
     'quiet': True,
     'no_warnings': True,
     'nocheckcertificate': True,
-    'socket_timeout': 15, # Asla 15 saniyeden fazla askıda kalıp donmaz
-    'extractor_args': {'instagram': {'api': ['graphql']}}, # Instagramı hızlı geçmek için
-    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
+    'socket_timeout': 15,
+    'extractor_args': {'instagram': {'api': ['graphql']}},
+    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+    # yt-dlp'ye "sesi ve görüntüyü bu motorla zorla birleştir" diyoruz:
+    'ffmpeg_location': ffmpeg_korsan_yol 
 }
 
 @app.post("/get-info")
 async def get_info(request: VideoRequest):
-    clean_link = clean_url(request.url) # Link temizlendi
-    
+    clean_link = clean_url(request.url)
     ydl_opts = base_ydl_opts.copy()
-    ydl_opts.update({
-        'skip_download': True,
-        'extract_flat': True,
-    })
+    ydl_opts.update({'skip_download': True, 'extract_flat': True})
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -66,7 +67,7 @@ async def download_video(request: VideoRequest):
     
     ydl_opts = base_ydl_opts.copy()
     ydl_opts.update({
-        # Görüntü ve sesi alıp MP4 olarak birleştirir, bulamazsa en iyi tek parçayı alır
+        # Sesi ve görüntüyü ayrı ayrı en iyi kalitede alıp MP4 yapar
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
         'merge_output_format': 'mp4',
         'outtmpl': output_template,
@@ -88,7 +89,7 @@ async def download_video(request: VideoRequest):
         return FileResponse(downloaded_file, media_type="video/mp4", filename="video.mp4")
     except Exception as e:
         print("İndirme Hatası:", e)
-        raise HTTPException(status_code=400, detail="Instagram bu videoyu indirmeyi reddetti.")
+        raise HTTPException(status_code=400, detail="Video indirilemedi.")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
