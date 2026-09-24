@@ -1,6 +1,9 @@
 downloads/
-downloads/
-downloads/
 venv/
 .vercel
 .env*
+cookies.txt
+*cookies*.txt
+__pycache__/
+*.pyc
+.DS_Store

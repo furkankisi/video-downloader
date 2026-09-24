@@ -1,5 +1,6 @@
 fastapi
-uvicorn
-git+https://github.com/yt-dlp/yt-dlp.git
+uvicorn[standard]
 pydantic
+httpx
+yt-dlp[default,curl-cffi,deno]
 imageio-ffmpeg

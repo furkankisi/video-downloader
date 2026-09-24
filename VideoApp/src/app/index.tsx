@@ -5,10 +5,36 @@ import {
 } from 'react-native';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import * as FileSystem from 'expo-file-system';
+// SDK 54+ : createDownloadResumable/documentDirectory artık sadece legacy pakette (yeni pakette çağrılınca hata fırlatır)
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
-const API_BASE = "https://video-downloader-cvtw.onrender.com"; 
+const API_BASE = "https://video-downloader-cvtw.onrender.com";
+
+// Render ücretsiz plan uyurken ilk istek 30-60 sn sürebilir
+const INFO_TIMEOUT_MS = 70000;
+
+// "Şu videoya bak https://vm.tiktok.com/xyz/ #fyp" gibi paylaşım metninden sadece linki al
+const extractUrl = (text: string): string => {
+  const m = text.match(/https?:\/\/[^\s<>"']+/i);
+  return m ? m[0].replace(/[).,;]+$/, '') : text.trim();
+};
+
+const detectPlatform = (text: string, fallback: string): string => {
+  const t = text.toLowerCase();
+  if (t.includes('instagram.com') || t.includes('instagr.am')) return 'instagram';
+  if (t.includes('youtube.com') || t.includes('youtu.be')) return 'youtube';
+  if (t.includes('tiktok.com')) return 'tiktok';
+  return fallback;
+};
+
+const readError = async (response: Response, fallback: string): Promise<string> => {
+  try {
+    const j = await response.json();
+    if (typeof j?.detail === 'string') return j.detail;
+  } catch {}
+  return fallback;
+};
 
 export default function App() {
   const [url, setUrl] = useState('');
@@ -18,6 +44,9 @@ export default function App() {
   
   const [videoInfo, setVideoInfo] = useState<{ title: string; thumbnail: string } | null>(null);
   const [selectedQuality, setSelectedQuality] = useState('best'); 
+  const [infoError, setInfoError] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestIdRef = useRef(0);
 
   const scrollX = useRef(new Animated.Value(0)).current;
 
@@ -38,10 +67,7 @@ export default function App() {
 
   const handleTabPress = (targetPlatform: string) => {
     if (url.trim().length > 0) {
-      let linkPlatform = activePlatform;
-      if (url.includes('instagram.com')) linkPlatform = 'instagram';
-      else if (url.includes('youtube.com') || url.includes('youtu.be')) linkPlatform = 'youtube';
-      else if (url.includes('tiktok.com')) linkPlatform = 'tiktok';
+      const linkPlatform = detectPlatform(url, activePlatform);
 
       if (targetPlatform !== linkPlatform) {
         Alert.alert(
@@ -54,38 +80,54 @@ export default function App() {
     setActivePlatform(targetPlatform);
   };
 
-  const handleUrlChange = async (text: string) => {
-    setUrl(text);
-    setVideoInfo(null); 
-
-    if (!text.includes('http')) return;
-
-    let detected = activePlatform;
-    if (text.includes('instagram.com')) detected = 'instagram';
-    else if (text.includes('youtube.com') || text.includes('youtu.be')) detected = 'youtube';
-    else if (text.includes('tiktok.com')) detected = 'tiktok';
-
-    if (detected !== activePlatform) {
-      setActivePlatform(detected);
-    }
-
+  const fetchInfo = async (link: string, platform: string, reqId: number) => {
     setIsLoadingInfo(true);
+    setInfoError(null);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), INFO_TIMEOUT_MS);
     try {
-      const response = await fetch(`${API_BASE}/info-${detected}`, {
+      const response = await fetch(`${API_BASE}/info-${platform}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: text }),
+        body: JSON.stringify({ url: link }),
+        signal: controller.signal,
       });
-      const data = await response.json();
+      if (reqId !== requestIdRef.current) return; // daha yeni bir istek var, bunu yok say
       if (response.ok) {
-        setVideoInfo(data);
+        setVideoInfo(await response.json());
+      } else {
+        setInfoError(await readError(response, 'Video bilgisi alınamadı.'));
       }
-    } catch (e) {
-      console.log("Önizleme alınamadı", e);
-      setVideoInfo({ title: "Video Hazır", thumbnail: "" });
+    } catch (e: any) {
+      if (reqId !== requestIdRef.current) return;
+      setInfoError(e?.name === 'AbortError'
+        ? 'Sunucu yanıt vermedi (uyanıyor olabilir), tekrar deneyin.'
+        : 'Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin.');
     } finally {
-      setIsLoadingInfo(false);
+      clearTimeout(timer);
+      if (reqId === requestIdRef.current) setIsLoadingInfo(false);
     }
+  };
+
+  const handleUrlChange = (text: string) => {
+    setUrl(text);
+    setVideoInfo(null);
+    setInfoError(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    requestIdRef.current += 1;
+    const reqId = requestIdRef.current;
+
+    if (!/https?:\/\/\S{6,}/i.test(text)) {
+      setIsLoadingInfo(false);
+      return;
+    }
+
+    const link = extractUrl(text);
+    const detected = detectPlatform(link, activePlatform);
+    if (detected !== activePlatform) setActivePlatform(detected);
+
+    // Her tuş vuruşunda değil, yazmayı bıraktıktan 600 ms sonra istek at
+    debounceRef.current = setTimeout(() => fetchInfo(link, detected, reqId), 600);
   };
 
   const handlePaste = async () => {
@@ -98,8 +140,12 @@ export default function App() {
   };
 
   const handleClear = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    requestIdRef.current += 1;
     setUrl('');
     setVideoInfo(null);
+    setInfoError(null);
+    setIsLoadingInfo(false);
   };
 
   const handleDownload = async () => {
@@ -111,9 +157,11 @@ export default function App() {
     setIsDownloading(true);
 
     try {
-      const endpoint = `${API_BASE}/download-${activePlatform}`;
-      const payload: any = { url: url };
-      if (activePlatform === 'youtube' && !isYoutubeShort) {
+      const link = extractUrl(url);
+      const platform = detectPlatform(link, activePlatform);
+      const endpoint = `${API_BASE}/download-${platform}`;
+      const payload: any = { url: link };
+      if (platform === 'youtube' && !isYoutubeShort) {
         payload.quality = selectedQuality;
       }
 
@@ -123,20 +171,20 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        if (!response.ok) throw new Error("İndirme başarısız.");
+        if (!response.ok) throw new Error(await readError(response, "İndirme başarısız."));
         
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = blobUrl;
-        a.download = `${activePlatform}_video_${Date.now()}.mp4`;
+        a.download = `${platform}_video_${Date.now()}.mp4`;
         document.body.appendChild(a);
         a.click();
         a.remove();
         window.URL.revokeObjectURL(blobUrl);
       } else {
-        const dir = (FileSystem as any).documentDirectory || 'file:///var/mobile/';
-        const fileUri = `${dir}${activePlatform}_video_${Date.now()}.mp4`;
+        const dir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
+        const fileUri = `${dir}${platform}_video_${Date.now()}.mp4`;
 
         const downloadOptions: any = {
           httpMethod: 'POST',
@@ -147,15 +195,22 @@ export default function App() {
         const downloadResumable = FileSystem.createDownloadResumable(endpoint, fileUri, downloadOptions);
         const result = await downloadResumable.downloadAsync();
         
-        if (result && result.status !== 200) {
+        if (!result) throw new Error("İndirme iptal edildi.");
+
+        if (result.status !== 200) {
+          // Sunucu hata durumunda JSON döner; dosyanın içinden gerçek sebebi oku
+          let msg = "Video indirilemedi veya sunucu engelledi.";
+          try {
+            const body = await FileSystem.readAsStringAsync(result.uri);
+            const j = JSON.parse(body);
+            if (typeof j?.detail === 'string') msg = j.detail;
+          } catch {}
           await FileSystem.deleteAsync(result.uri, { idempotent: true });
-          throw new Error("Video indirilemedi veya sunucu engelledi.");
+          throw new Error(msg);
         }
 
-        if (result && result.uri) {
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(result.uri);
-          }
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(result.uri, { mimeType: 'video/mp4', UTI: 'public.mpeg-4' });
         }
       }
     } catch (error: any) {
@@ -224,8 +279,15 @@ export default function App() {
             </View>
           )}
 
+          {infoError && !isLoadingInfo && (
+            <View style={styles.errorCard}>
+              <Ionicons name="alert-circle" size={20} color="#EF4444" style={{ marginRight: 8 }} />
+              <Text style={styles.errorText}>{infoError}</Text>
+            </View>
+          )}
+
           {/* Önizleme Kartı (Thumbnail yoksa şık bir ikon gösterir) */}
-          {url.length > 5 && !isLoadingInfo && (
+          {url.length > 5 && !isLoadingInfo && !infoError && (
             <View style={styles.previewCard}>
               {videoInfo?.thumbnail ? (
                 <Image source={{ uri: videoInfo.thumbnail }} style={styles.thumbnail} resizeMode="cover" />
@@ -330,6 +392,8 @@ const styles = StyleSheet.create({
   clearBtn: { marginRight: 10 },
   input: { flex: 1, paddingVertical: 18, color: '#F8FAFC', fontSize: 16 },
   pasteBtn: { padding: 10 },
+  errorCard: { flexDirection: 'row', alignItems: 'center', width: '100%', backgroundColor: '#1F0F14', borderRadius: 14, borderWidth: 1, borderColor: '#EF4444', padding: 12, marginBottom: 20 },
+  errorText: { color: '#FCA5A5', fontSize: 13, flex: 1 },
   loadingInfoContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   loadingInfoText: { color: '#00F2FE', marginLeft: 8, fontSize: 14, fontWeight: '600' },
   
