@@ -10,18 +10,24 @@ class VideoRequest(BaseModel):
     url: str
     quality: str = "best"
 
+def get_ydl_opts(download=True):
+    opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'geo_bypass': True,
+        'nocheckcertificate': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    }
+    # Eğer ana dizine cookies.txt koyduysan otomatik kullanır ve bot engelini aşar!
+    if os.path.exists('cookies.txt'):
+        opts['cookiefile'] = 'cookies.txt'
+    return opts
+
 @router.post("/info-youtube")
 async def info_youtube(request: VideoRequest):
     try:
-        ydl_opts = {
-            'quiet': True,
-            'no_warnings': True,
-            'geo_bypass': True,
-            'nocheckcertificate': True,
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-            'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        opts = get_ydl_opts(download=False)
+        with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
             return {
                 "title": info.get("title", "YouTube Videosu"),
@@ -29,10 +35,7 @@ async def info_youtube(request: VideoRequest):
             }
     except Exception as e:
         print("YouTube Bilgi Hatası:", e)
-        return {
-            "title": "YouTube Videosu",
-            "thumbnail": ""
-        }
+        return {"title": "YouTube Videosu", "thumbnail": ""}
 
 @router.post("/download-youtube")
 async def download_youtube(request: VideoRequest):
@@ -46,18 +49,12 @@ async def download_youtube(request: VideoRequest):
     elif request.quality == '360p':
         format_opt = 'best[height<=360][ext=mp4]/best'
 
-    ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'geo_bypass': True,
-        'nocheckcertificate': True,
-        'format': format_opt,
-        'outtmpl': final_filepath,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
-    }
+    opts = get_ydl_opts(download=True)
+    opts['format'] = format_opt
+    opts['outtmpl'] = final_filepath
+
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(opts) as ydl:
             ydl.download([request.url])
             
         if not os.path.exists(final_filepath) or os.path.getsize(final_filepath) < 30000:
@@ -66,4 +63,4 @@ async def download_youtube(request: VideoRequest):
         return FileResponse(final_filepath, media_type="video/mp4", filename="yt_video.mp4")
     except Exception as e:
         print("YouTube İndirme Hatası:", e)
-        raise HTTPException(status_code=400, detail="YouTube videosu indirilemedi.")
+        raise HTTPException(status_code=400, detail="YouTube videosu indirilemedi (Bot korumasına takıldı).")
