@@ -6,8 +6,12 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import yt_dlp
+import imageio_ffmpeg
 
-app = FastAPI(title="Instagram İndirici (Kesin Uyumlu)")
+# Apple cihazları dahil her yerde çalışan evrensel dönüştürücü motoru
+ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+
+app = FastAPI(title="Instagram İndirici (Evrensel Uyumlu)")
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,7 +35,6 @@ async def get_info(request: VideoRequest):
     ydl_opts = {
         'quiet': True,
         'skip_download': True,
-        # Taktik burada: Instagram'a "Ben bir iPhone'um" diyoruz
         'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
     }
     try:
@@ -50,13 +53,18 @@ async def download_video(request: VideoRequest):
     file_id = str(uuid.uuid4())
     os.makedirs("downloads", exist_ok=True)
     
-    # Her cihazda açılması için uzantıyı SADECE ve kesinlikle mp4 yapıyoruz
-    output_template = f"downloads/{file_id}.mp4"
+    output_template = f"downloads/{file_id}.%(ext)s"
     
     ydl_opts = {
         'quiet': True,
-        # SADECE gerçek MP4 formatını kabul ediyoruz, webm vb. gelirse reddediyoruz.
-        'format': 'best[ext=mp4]', 
+        'format': 'best',
+        'ffmpeg_location': ffmpeg_path,
+        # KESİN ÇÖZÜM: Hangi formatta gelirse gelsin Apple ve diğer tüm cihazların 
+        # %100 açabileceği standart MP4 formatına (H.264/AAC) dönüştürüyoruz.
+        'postprocessors': [{
+            'key': 'FFmpegVideoConvertor',
+            'preferedformat': 'mp4',
+        }],
         'outtmpl': output_template,
         'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
     }
@@ -65,12 +73,21 @@ async def download_video(request: VideoRequest):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([clean_link])
 
-        downloaded_file = f"downloads/{file_id}.mp4"
+        downloaded_file = None
+        for file in os.listdir("downloads"):
+            if file.startswith(file_id) and file.endswith(".mp4"):
+                downloaded_file = os.path.join("downloads", file)
+                break
 
-        if not os.path.exists(downloaded_file):
+        if not downloaded_file or not os.path.exists(downloaded_file):
+            for file in os.listdir("downloads"):
+                if file.startswith(file_id):
+                    downloaded_file = os.path.join("downloads", file)
+                    break
+
+        if not downloaded_file or not os.path.exists(downloaded_file):
             raise HTTPException(status_code=400, detail="Dosya oluşturulamadı.")
 
-        # Tamamen Apple cihazlarına uyumlu (Mac/iPhone) olarak gönderiyoruz
         return FileResponse(downloaded_file, media_type="video/mp4", filename="ig_video.mp4")
     except Exception as e:
         print("İndirme Hatası:", e)
