@@ -16,8 +16,7 @@ async def info_youtube(request: VideoRequest):
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
+            'extractor_args': {'youtube': {'player_client': ['web_creator', 'mweb', 'web']}}
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
@@ -46,8 +45,7 @@ async def download_youtube(request: VideoRequest):
         'no_warnings': True,
         'format': format_opt,
         'outtmpl': final_filepath,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
+        'extractor_args': {'youtube': {'player_client': ['web_creator', 'mweb', 'web']}}
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
