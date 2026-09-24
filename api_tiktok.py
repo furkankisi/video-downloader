@@ -35,10 +35,26 @@ def _resolve(url: str) -> str:
     return url
 
 
-def _ydl_opts() -> dict:
-    opts = base_ydl_opts("tiktok")
-    opts["http_headers"] = {"User-Agent": MOBILE_UA, "Referer": "https://www.tiktok.com/"}
-    return try_impersonate(opts)
+def _ydl_attempts():
+    """
+    Sırayla denenecek yt-dlp ayarları.
+    ÖNEMLİ: Özel mobil User-Agent + Referer göndermek TikTok'un video verisi boş bir sayfa
+    döndürmesine ("Video not available, status code 0") yol açıyordu. /debug'da hiçbir özel
+    başlık olmadan video çalıştı, bu yüzden ilk deneme SADE ayarlarla yapılıyor.
+    """
+    yield base_ydl_opts("tiktok")                 # 1) sade (debug'da çalışan hal)
+    yield try_impersonate(base_ydl_opts("tiktok"))  # 2) Chrome taklidiyle (UA'ya dokunmadan)
+
+
+def _short(e: Exception) -> str:
+    return str(e).replace("ERROR: ", "").splitlines()[0][:160]
+
+
+def _final_error(errors) -> HTTPException:
+    msg = friendly_error(errors[0], "TikTok")
+    if len(errors) > 1:
+        msg += " | yedek: " + _short(errors[-1])
+    return HTTPException(status_code=400, detail=msg)
 
 
 def _oembed(url: str) -> dict:
@@ -65,13 +81,14 @@ def info_tiktok(request: VideoRequest):
     url = _resolve(extract_url(request.url))
     errors = []
 
-    try:
-        with yt_dlp.YoutubeDL({**_ydl_opts(), "skip_download": True}) as ydl:
-            info = ydl.extract_info(url, download=False)
-            return {"title": info.get("title") or "TikTok Videosu", "thumbnail": info.get("thumbnail") or ""}
-    except Exception as e:
-        errors.append(e)
-        print("TikTok yt-dlp bilgi hatası:", e)
+    for opts in _ydl_attempts():
+        try:
+            with yt_dlp.YoutubeDL({**opts, "skip_download": True}) as ydl:
+                info = ydl.extract_info(url, download=False)
+                return {"title": info.get("title") or "TikTok Videosu", "thumbnail": info.get("thumbnail") or ""}
+        except Exception as e:
+            errors.append(e)
+            print("TikTok yt-dlp bilgi hatası:", e)
 
     try:
         return _oembed(url)
@@ -86,7 +103,7 @@ def info_tiktok(request: VideoRequest):
         errors.append(e)
         print("TikTok tikwm bilgi hatası:", e)
 
-    raise HTTPException(status_code=400, detail=friendly_error(errors[0], "TikTok"))
+    raise _final_error(errors)
 
 
 @router.post("/download-tiktok")
@@ -95,22 +112,22 @@ def download_tiktok(request: VideoRequest):
     out = new_output_path("mp4")
     errors = []
 
-    # 1) yt-dlp
-    try:
-        opts = _ydl_opts()
-        opts["format"] = TT_FORMAT
-        opts["outtmpl"] = str(out.with_suffix("")) + ".%(ext)s"
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.download([url])
-        final = find_output(out)
-        if final and final.stat().st_size >= MIN_FILE_SIZE:
-            return FileResponse(str(final), media_type="video/mp4", filename="tiktok_video.mp4",
-                                background=BackgroundTask(remove_files_with_stem, out))
-        raise RuntimeError("Bozuk veya boş dosya indirildi")
-    except Exception as e:
-        errors.append(e)
-        print("TikTok yt-dlp indirme hatası:", e)
-        remove_files_with_stem(out)
+    # 1) yt-dlp (sade -> Chrome taklidi)
+    for opts in _ydl_attempts():
+        try:
+            opts["format"] = TT_FORMAT
+            opts["outtmpl"] = str(out.with_suffix("")) + ".%(ext)s"
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                ydl.download([url])
+            final = find_output(out)
+            if final and final.stat().st_size >= MIN_FILE_SIZE:
+                return FileResponse(str(final), media_type="video/mp4", filename="tiktok_video.mp4",
+                                    background=BackgroundTask(remove_files_with_stem, out))
+            raise RuntimeError("Bozuk veya boş dosya indirildi")
+        except Exception as e:
+            errors.append(e)
+            print("TikTok yt-dlp indirme hatası:", e)
+            remove_files_with_stem(out)
 
     # 2) Yedek API
     try:
@@ -135,4 +152,4 @@ def download_tiktok(request: VideoRequest):
         print("TikTok yedek indirme hatası:", e)
         remove_files_with_stem(out)
 
-    raise HTTPException(status_code=400, detail=friendly_error(errors[0], "TikTok"))
+    raise _final_error(errors)
