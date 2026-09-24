@@ -53,11 +53,14 @@ async def download_video(request: VideoRequest):
     clean_link = clean_ig_url(request.url)
     file_id = str(uuid.uuid4())
     os.makedirs("downloads", exist_ok=True)
-    output_template = f"downloads/{file_id}.mp4"
+    
+    # Uzantıyı zorla mp4 yapmıyoruz, dosyanın kendi orijinal uzantısını alıyoruz
+    output_template = f"downloads/{file_id}.%(ext)s"
     
     ydl_opts = {
         'quiet': True,
-        'format': 'best', # Standart tek parça MP4. (Artık orijinal ve sesli inecek)
+        # KESİN EMİR: "Bana sadece orijinal MP4 uzantılı dosyayı getir!"
+        'format': 'best[ext=mp4]/best', 
         'outtmpl': output_template,
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
     }
@@ -66,9 +69,13 @@ async def download_video(request: VideoRequest):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([clean_link])
 
-        downloaded_file = os.path.join("downloads", f"{file_id}.mp4")
+        downloaded_file = None
+        for file in os.listdir("downloads"):
+            if file.startswith(file_id):
+                downloaded_file = os.path.join("downloads", file)
+                break
 
-        if not os.path.exists(downloaded_file):
+        if not downloaded_file or not os.path.exists(downloaded_file):
             raise HTTPException(status_code=400, detail="Dosya oluşturulamadı.")
 
         return FileResponse(downloaded_file, media_type="video/mp4", filename="ig_video.mp4")
