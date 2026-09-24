@@ -10,24 +10,16 @@ class VideoRequest(BaseModel):
     url: str
     quality: str = "best"
 
-def get_ydl_opts(download=True):
-    opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'geo_bypass': True,
-        'nocheckcertificate': True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-    }
-    # Eğer ana dizine cookies.txt koyduysan otomatik kullanır ve bot engelini aşar!
-    if os.path.exists('cookies.txt'):
-        opts['cookiefile'] = 'cookies.txt'
-    return opts
-
 @router.post("/info-youtube")
 async def info_youtube(request: VideoRequest):
     try:
-        opts = get_ydl_opts(download=False)
-        with yt_dlp.YoutubeDL(opts) as ydl:
+        # YouTube'u dize getiren orijinal ve kesin çalışan player_client ayarı
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extractor_args': {'youtube': {'player_client': ['ios', 'android']}}
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
             return {
                 "title": info.get("title", "YouTube Videosu"),
@@ -49,12 +41,15 @@ async def download_youtube(request: VideoRequest):
     elif request.quality == '360p':
         format_opt = 'best[height<=360][ext=mp4]/best'
 
-    opts = get_ydl_opts(download=True)
-    opts['format'] = format_opt
-    opts['outtmpl'] = final_filepath
-
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'format': format_opt,
+        'outtmpl': final_filepath,
+        'extractor_args': {'youtube': {'player_client': ['ios', 'android']}}
+    }
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([request.url])
             
         if not os.path.exists(final_filepath) or os.path.getsize(final_filepath) < 30000:
@@ -63,4 +58,4 @@ async def download_youtube(request: VideoRequest):
         return FileResponse(final_filepath, media_type="video/mp4", filename="yt_video.mp4")
     except Exception as e:
         print("YouTube İndirme Hatası:", e)
-        raise HTTPException(status_code=400, detail="YouTube videosu indirilemedi (Bot korumasına takıldı).")
+        raise HTTPException(status_code=400, detail="YouTube indirme başarısız.")
