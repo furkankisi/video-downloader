@@ -3,7 +3,9 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import yt_dlp
+import imageio_ffmpeg
 
+ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
 router = APIRouter()
 
 class VideoRequest(BaseModel):
@@ -20,7 +22,7 @@ async def info_youtube(request: VideoRequest):
             'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(request.url, download=False)
+            info = yt_dlp.YoutubeDL(ydl_opts).extract_info(request.url, download=False)
             return {
                 "title": info.get("title", "YouTube Videosu"),
                 "thumbnail": info.get("thumbnail", "")
@@ -35,16 +37,18 @@ async def download_youtube(request: VideoRequest):
     os.makedirs("downloads", exist_ok=True)
     final_filepath = f"downloads/{file_id}.mp4"
     
-    format_opt = 'best[ext=mp4]/best'
+    format_opt = 'bestvideo[ext=mp4]+bestaudio[m4a]/best[ext=mp4]/best'
     if request.quality == '720p':
-        format_opt = 'best[height<=720][ext=mp4]/best'
+        format_opt = 'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720][ext=mp4]/best'
     elif request.quality == '360p':
-        format_opt = 'best[height<=360][ext=mp4]/best'
+        format_opt = 'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360][ext=mp4]/best'
 
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
         'format': format_opt,
+        'merge_output_format': 'mp4',
+        'ffmpeg_location': ffmpeg_path,
         'outtmpl': final_filepath,
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'extractor_args': {'youtube': {'player_client': ['android', 'web']}}

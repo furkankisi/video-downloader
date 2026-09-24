@@ -167,19 +167,6 @@ export default function App() {
   return (
     <View style={styles.container}>
       
-      {/* Arka Plan Kayan Animasyon Logoları (Şimdi yarı saydam arka plan sayesinde her yerden görünüyor) */}
-      <View style={styles.backgroundWrapper}>
-        <Animated.View style={[styles.movingBackground, { transform: [{ translateX: scrollX }] }]}>
-          {[...Array(8)].map((_, i) => (
-            <View key={i} style={styles.logoRow}>
-              <FontAwesome5 name="instagram" size={90} color="rgba(0, 242, 254, 0.12)" style={styles.bgIcon} />
-              <FontAwesome5 name="youtube" size={90} color="rgba(255, 0, 80, 0.12)" style={styles.bgIcon} />
-              <FontAwesome5 name="tiktok" size={90} color="rgba(255, 255, 255, 0.12)" style={styles.bgIcon} />
-            </View>
-          ))}
-        </Animated.View>
-      </View>
-
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.content}>
         <ScrollView contentContainerStyle={styles.scrollArea} showsVerticalScrollIndicator={false}>
           
@@ -236,7 +223,7 @@ export default function App() {
             </View>
           )}
 
-          {/* Düzeltilmiş Şık ve Sabit Boyutlu Önizleme Kartı */}
+          {/* Sabit Boyutlu Şık Önizleme Kartı */}
           {videoInfo && !isLoadingInfo && (
             <View style={styles.previewCard}>
               {videoInfo.thumbnail ? (
@@ -249,7 +236,7 @@ export default function App() {
             </View>
           )}
 
-          {/* YouTube Kalite Seçici (Sadece normal videolar için) */}
+          {/* YouTube Kalite Seçici */}
           {activePlatform === 'youtube' && !isYoutubeShort && videoInfo && (
             <View style={styles.qualityContainer}>
               <Text style={styles.qualityLabel}>Kalite Seç:</Text>
@@ -291,41 +278,58 @@ export default function App() {
 
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* ARKA PLAN ANİMASYONU TAMAMEN EN ALTTA (Önünde hiçbir şey yok) */}
+      <View style={styles.bottomAnimationContainer} pointerEvents="none">
+        <Animated.View style={[styles.movingBackground, { transform: [{ translateX: scrollX }] }]}>
+          {[...Array(8)].map((_, i) => (
+            <View key={i} style={styles.logoRow}>
+              <FontAwesome5 name="instagram" size={60} color="rgba(0, 242, 254, 0.2)" style={styles.bgIcon} />
+              <FontAwesome5 name="youtube" size={60} color="rgba(255, 0, 80, 0.2)" style={styles.bgIcon} />
+              <FontAwesome5 name="tiktok" size={60} color="rgba(255, 255, 255, 0.2)" style={styles.bgIcon} />
+            </View>
+          ))}
+        </Animated.View>
+      </View>
+
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#030307' },
-  backgroundWrapper: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', overflow: 'hidden' },
+  
+  // Animasyon artık tam dipte, hiçbir şeyi engellemiyor ve net görünüyor
+  bottomAnimationContainer: { position: 'absolute', bottom: 20, left: 0, right: 0, height: 70, justifyContent: 'center', overflow: 'hidden' },
   movingBackground: { flexDirection: 'row', width: 4000 },
   logoRow: { flexDirection: 'row', alignItems: 'center' },
-  bgIcon: { marginHorizontal: 45 },
-  content: { flex: 1, zIndex: 1 },
+  bgIcon: { marginHorizontal: 35 },
+
+  content: { flex: 1, zIndex: 1, marginBottom: 80 }, // İçerik animasyonun üstünde kalır
   scrollArea: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40, alignItems: 'center' },
   title: { fontSize: 36, fontWeight: '900', color: '#FFFFFF', letterSpacing: 1.5, marginBottom: 30, textAlign: 'center', textShadowColor: '#00F2FE', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 },
   proBadge: { fontSize: 16, color: '#00F2FE', fontWeight: 'bold' },
-  platformSelector: { flexDirection: 'row', backgroundColor: 'rgba(15, 16, 26, 0.85)', borderRadius: 20, padding: 8, marginBottom: 25, width: '100%', justifyContent: 'space-between', borderWidth: 1, borderColor: '#1E2238' },
+  platformSelector: { flexDirection: 'row', backgroundColor: '#0F101A', borderRadius: 20, padding: 8, marginBottom: 25, width: '100%', justifyContent: 'space-between', borderWidth: 1, borderColor: '#1E2238' },
   platformBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14 },
   
   activeInstagram: { backgroundColor: '#E1306C', borderWidth: 1.5, borderColor: '#FF70A6', shadowColor: '#E1306C', elevation: 12, shadowOpacity: 0.7, shadowRadius: 10 },
   activeYoutube: { backgroundColor: '#FF0000', borderWidth: 1.5, borderColor: '#FF6666', shadowColor: '#FF0000', elevation: 12, shadowOpacity: 0.7, shadowRadius: 10 },
   activeTiktok: { backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#FF0050', shadowColor: '#FF0050', elevation: 12, shadowOpacity: 0.8, shadowRadius: 12 },
 
-  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(15, 16, 26, 0.85)', borderRadius: 16, borderWidth: 1, borderColor: '#2A2F4C', marginBottom: 20, paddingHorizontal: 16, width: '100%', shadowColor: '#00F2FE', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5 },
+  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0F101A', borderRadius: 16, borderWidth: 1, borderColor: '#2A2F4C', marginBottom: 20, paddingHorizontal: 16, width: '100%', shadowColor: '#00F2FE', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5 },
   clearBtn: { marginRight: 10 },
   input: { flex: 1, paddingVertical: 18, color: '#F8FAFC', fontSize: 16 },
   pasteBtn: { padding: 10 },
   loadingInfoContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   loadingInfoText: { color: '#00F2FE', marginLeft: 8, fontSize: 14, fontWeight: '600' },
   
-  // Düzeltilmiş Thumbnail Kartı (Artık tüm ekrana yayılmıyor, sabit ve düzgün)
-  previewCard: { width: '100%', backgroundColor: 'rgba(15, 16, 26, 0.9)', borderRadius: 20, padding: 14, borderWidth: 1, borderColor: '#00F2FE', marginBottom: 20, alignItems: 'center', shadowColor: '#00F2FE', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 },
-  thumbnail: { width: '100%', height: 160, borderRadius: 12, marginBottom: 12, backgroundColor: '#1E2238' },
+  // Küçük ve Sabit Thumbnail (Tüm ekrana yayılma sorunu bitti)
+  previewCard: { width: '100%', backgroundColor: '#0F101A', borderRadius: 20, padding: 14, borderWidth: 1, borderColor: '#00F2FE', marginBottom: 20, alignItems: 'center', shadowColor: '#00F2FE', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 },
+  thumbnail: { width: '100%', height: 140, borderRadius: 12, marginBottom: 12, backgroundColor: '#1E2238' },
   titleContainer: { flexDirection: 'row', alignItems: 'center', width: '100%', paddingHorizontal: 4 },
   videoTitle: { color: '#F8FAFC', fontSize: 14, fontWeight: '600', flex: 1 },
   
-  qualityContainer: { flexDirection: 'row', width: '100%', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, backgroundColor: 'rgba(15, 16, 26, 0.85)', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#2A2F4C' },
+  qualityContainer: { flexDirection: 'row', width: '100%', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, backgroundColor: '#0F101A', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#2A2F4C' },
   qualityLabel: { color: '#94A3B8', fontWeight: 'bold', fontSize: 14 },
   qualityBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#1E2238' },
   activeQualityBtn: { backgroundColor: '#FF0000', shadowColor: '#FF0000', shadowOpacity: 0.5, shadowRadius: 6, elevation: 5 },

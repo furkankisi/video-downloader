@@ -3,7 +3,9 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import yt_dlp
+import imageio_ffmpeg
 
+ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
 router = APIRouter()
 
 class VideoRequest(BaseModel):
@@ -36,7 +38,9 @@ async def download_tiktok(request: VideoRequest):
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
-        'format': 'best[ext=mp4]/best',
+        'format': 'bestvideo[ext=mp4]+bestaudio[m4a]/best[ext=mp4]/best',
+        'merge_output_format': 'mp4',
+        'ffmpeg_location': ffmpeg_path,
         'outtmpl': final_filepath,
         'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
     }
