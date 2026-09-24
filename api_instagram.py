@@ -9,9 +9,21 @@ router = APIRouter()
 class VideoRequest(BaseModel):
     url: str
 
+@router.post("/info-instagram")
+async def info_instagram(request: VideoRequest):
+    try:
+        ydl_opts = {'quiet': True}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(request.url, download=False)
+            return {
+                "title": info.get("title", "Instagram Videosu"),
+                "thumbnail": info.get("thumbnail", "")
+            }
+    except Exception:
+        raise HTTPException(status_code=400, detail="Instagram bilgileri alınamadı.")
+
 @router.post("/download-instagram")
 async def download_instagram(request: VideoRequest):
-    clean_link = request.url.split("?")[0] if "?" in request.url else request.url
     file_id = str(uuid.uuid4())
     os.makedirs("downloads", exist_ok=True)
     final_filepath = f"downloads/{file_id}.mp4"
@@ -24,9 +36,7 @@ async def download_instagram(request: VideoRequest):
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([clean_link])
-        if not os.path.exists(final_filepath) or os.path.getsize(final_filepath) < 100000:
-            raise Exception("Hata")
+            ydl.download([request.url])
         return FileResponse(final_filepath, media_type="video/mp4", filename="ig_video.mp4")
     except Exception:
-        raise HTTPException(status_code=400, detail="Instagram videoyu engelledi.")
+        raise HTTPException(status_code=400, detail="Instagram indirme başarısız.")

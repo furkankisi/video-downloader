@@ -9,6 +9,19 @@ router = APIRouter()
 class VideoRequest(BaseModel):
     url: str
 
+@router.post("/info-tiktok")
+async def info_tiktok(request: VideoRequest):
+    try:
+        ydl_opts = {'quiet': True}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(request.url, download=False)
+            return {
+                "title": info.get("title", "TikTok Videosu"),
+                "thumbnail": info.get("thumbnail", "")
+            }
+    except Exception:
+        raise HTTPException(status_code=400, detail="TikTok bilgileri alınamadı.")
+
 @router.post("/download-tiktok")
 async def download_tiktok(request: VideoRequest):
     file_id = str(uuid.uuid4())
@@ -17,7 +30,7 @@ async def download_tiktok(request: VideoRequest):
     
     ydl_opts = {
         'quiet': True,
-        'format': 'best', # TikTok için varsayılan yeterli
+        'format': 'best',
         'outtmpl': final_filepath,
     }
     try:
@@ -25,4 +38,4 @@ async def download_tiktok(request: VideoRequest):
             ydl.download([request.url])
         return FileResponse(final_filepath, media_type="video/mp4", filename="tiktok_video.mp4")
     except Exception:
-        raise HTTPException(status_code=400, detail="TikTok videosu indirilemedi.")
+        raise HTTPException(status_code=400, detail="TikTok indirme başarısız.")

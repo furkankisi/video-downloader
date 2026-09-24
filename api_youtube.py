@@ -8,6 +8,20 @@ router = APIRouter()
 
 class VideoRequest(BaseModel):
     url: str
+    quality: str = "best"
+
+@router.post("/info-youtube")
+async def info_youtube(request: VideoRequest):
+    try:
+        ydl_opts = {'quiet': True}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(request.url, download=False)
+            return {
+                "title": info.get("title", "YouTube Videosu"),
+                "thumbnail": info.get("thumbnail", "")
+            }
+    except Exception:
+        raise HTTPException(status_code=400, detail="YouTube bilgileri alınamadı.")
 
 @router.post("/download-youtube")
 async def download_youtube(request: VideoRequest):
@@ -15,9 +29,16 @@ async def download_youtube(request: VideoRequest):
     os.makedirs("downloads", exist_ok=True)
     final_filepath = f"downloads/{file_id}.mp4"
     
+    # Kaliteye göre format ayarı
+    format_opt = 'best[ext=mp4]/best'
+    if request.quality == '720p':
+        format_opt = 'best[height<=720][ext=mp4]/best'
+    elif request.quality == '360p':
+        format_opt = 'best[height<=360][ext=mp4]/best'
+
     ydl_opts = {
         'quiet': True,
-        'format': 'best[ext=mp4]/best', # YouTube için en temiz ve hızlı format
+        'format': format_opt,
         'outtmpl': final_filepath,
     }
     try:
@@ -25,4 +46,4 @@ async def download_youtube(request: VideoRequest):
             ydl.download([request.url])
         return FileResponse(final_filepath, media_type="video/mp4", filename="yt_video.mp4")
     except Exception:
-        raise HTTPException(status_code=400, detail="YouTube videosu indirilemedi.")
+        raise HTTPException(status_code=400, detail="YouTube indirme başarısız.")
