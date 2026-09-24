@@ -15,7 +15,8 @@ async def info_youtube(request: VideoRequest):
     try:
         ydl_opts = {
             'quiet': True,
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
@@ -44,7 +45,8 @@ async def download_youtube(request: VideoRequest):
         'format': format_opt,
         'format_sort': ['vcodec:h264', 'vcodec:avc1', 'acodec:aac'],
         'outtmpl': final_filepath,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -54,5 +56,6 @@ async def download_youtube(request: VideoRequest):
             raise Exception("Bozuk dosya")
             
         return FileResponse(final_filepath, media_type="video/mp4", filename="yt_video.mp4")
-    except Exception:
+    except Exception as e:
+        print("YouTube İndirme Hatası:", e)
         raise HTTPException(status_code=400, detail="YouTube indirme başarısız.")

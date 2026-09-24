@@ -47,5 +47,6 @@ async def download_tiktok(request: VideoRequest):
             raise Exception("Bozuk dosya")
             
         return FileResponse(final_filepath, media_type="video/mp4", filename="tiktok_video.mp4")
-    except Exception:
+    except Exception as e:
+        print("TikTok İndirme Hatası:", e)
         raise HTTPException(status_code=400, detail="TikTok indirme başarısız.")

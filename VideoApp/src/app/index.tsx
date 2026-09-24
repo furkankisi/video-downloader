@@ -34,6 +34,9 @@ export default function App() {
     startAnimation();
   }, []);
 
+  // Shorts tespiti
+  const isYoutubeShort = url.includes('/shorts/') || url.includes('youtube.com/shorts');
+
   const handleTabPress = (targetPlatform: string) => {
     if (url.trim().length > 0) {
       let linkPlatform = activePlatform;
@@ -110,7 +113,7 @@ export default function App() {
     try {
       const endpoint = `${API_BASE}/download-${activePlatform}`;
       const payload: any = { url: url };
-      if (activePlatform === 'youtube') {
+      if (activePlatform === 'youtube' && !isYoutubeShort) {
         payload.quality = selectedQuality;
       }
 
@@ -183,7 +186,7 @@ export default function App() {
           
           <Text style={styles.title}>VideoSaver <Text style={styles.proBadge}>PRO</Text></Text>
 
-          {/* Platform Seçici (Neon Stil) */}
+          {/* Platform Seçici (Tüm sekmeler neon çerçeveli) */}
           <View style={styles.platformSelector}>
             <TouchableOpacity 
               style={[styles.platformBtn, activePlatform === 'instagram' && styles.activeInstagram]}
@@ -234,7 +237,7 @@ export default function App() {
             </View>
           )}
 
-          {/* Dengeli ve Kullanıcı Dostu Önizleme Kartı */}
+          {/* Orantılı ve Düzenli Önizleme Kartı */}
           {videoInfo && !isLoadingInfo && (
             <View style={styles.previewCard}>
               {videoInfo.thumbnail ? (
@@ -247,8 +250,8 @@ export default function App() {
             </View>
           )}
 
-          {/* YouTube Kalite Seçici (Neon) */}
-          {activePlatform === 'youtube' && videoInfo && (
+          {/* YouTube Kalite Seçici (Sadece normal videolar için aktif, Shorts için gizli) */}
+          {activePlatform === 'youtube' && !isYoutubeShort && videoInfo && (
             <View style={styles.qualityContainer}>
               <Text style={styles.qualityLabel}>Kalite Seç:</Text>
               {['best', '720p', '360p'].map((q) => (
@@ -306,10 +309,10 @@ const styles = StyleSheet.create({
   platformSelector: { flexDirection: 'row', backgroundColor: '#0F101A', borderRadius: 20, padding: 8, marginBottom: 25, width: '100%', justifyContent: 'space-between', borderWidth: 1, borderColor: '#1E2238' },
   platformBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14 },
   
-  // Neon Platform Aktif Renkler
-  activeInstagram: { backgroundColor: '#E1306C', shadowColor: '#E1306C', elevation: 12, shadowOpacity: 0.6, shadowRadius: 10 },
-  activeYoutube: { backgroundColor: '#FF0000', shadowColor: '#FF0000', elevation: 12, shadowOpacity: 0.6, shadowRadius: 10 },
-  activeTiktok: { backgroundColor: '#FFFFFF', shadowColor: '#FF0050', elevation: 12, shadowOpacity: 0.8, shadowRadius: 12 }, // Beyaz ve Pembe (TikTok)
+  // Tüm Platformlar İçin Neon Aktif Stiller
+  activeInstagram: { backgroundColor: '#E1306C', borderWidth: 1.5, borderColor: '#FF70A6', shadowColor: '#E1306C', elevation: 12, shadowOpacity: 0.7, shadowRadius: 10 },
+  activeYoutube: { backgroundColor: '#FF0000', borderWidth: 1.5, borderColor: '#FF6666', shadowColor: '#FF0000', elevation: 12, shadowOpacity: 0.7, shadowRadius: 10 },
+  activeTiktok: { backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#FF0050', shadowColor: '#FF0050', elevation: 12, shadowOpacity: 0.8, shadowRadius: 12 },
 
   inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0F101A', borderRadius: 16, borderWidth: 1, borderColor: '#2A2F4C', marginBottom: 20, paddingHorizontal: 16, width: '100%', shadowColor: '#00F2FE', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5 },
   clearBtn: { marginRight: 10 },
@@ -318,11 +321,11 @@ const styles = StyleSheet.create({
   loadingInfoContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   loadingInfoText: { color: '#00F2FE', marginLeft: 8, fontSize: 14, fontWeight: '600' },
   
-  // Dengeli ve Şık Önizleme Kartı
-  previewCard: { width: '100%', backgroundColor: '#0F101A', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#00F2FE', marginBottom: 20, alignItems: 'center', shadowColor: '#00F2FE', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 },
-  thumbnail: { width: '100%', height: 200, borderRadius: 14, marginBottom: 14, backgroundColor: '#1E2238' },
+  // Düzeltilmiş Orantılı Önizleme Kartı (Artık devasa değil)
+  previewCard: { width: '100%', backgroundColor: '#0F101A', borderRadius: 20, padding: 14, borderWidth: 1, borderColor: '#00F2FE', marginBottom: 20, alignItems: 'center', shadowColor: '#00F2FE', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 },
+  thumbnail: { width: '100%', height: 150, borderRadius: 12, marginBottom: 12, backgroundColor: '#1E2238' },
   titleContainer: { flexDirection: 'row', alignItems: 'center', width: '100%', paddingHorizontal: 4 },
-  videoTitle: { color: '#F8FAFC', fontSize: 15, fontWeight: '600', flex: 1 },
+  videoTitle: { color: '#F8FAFC', fontSize: 14, fontWeight: '600', flex: 1 },
   
   qualityContainer: { flexDirection: 'row', width: '100%', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, backgroundColor: '#0F101A', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#2A2F4C' },
   qualityLabel: { color: '#94A3B8', fontWeight: 'bold', fontSize: 14 },
@@ -333,6 +336,6 @@ const styles = StyleSheet.create({
   downloadBtn: { flexDirection: 'row', width: '100%', paddingVertical: 18, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8 },
   btnInstagram: { backgroundColor: '#E1306C', shadowColor: '#E1306C' },
   btnYoutube: { backgroundColor: '#FF0000', shadowColor: '#FF0000' },
-  btnTiktok: { backgroundColor: '#FF0050', shadowColor: '#FF0050' }, // Neon Pembe İndir Butonu
+  btnTiktok: { backgroundColor: '#FF0050', shadowColor: '#FF0050' },
   downloadBtnText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', letterSpacing: 0.5 }
 });
