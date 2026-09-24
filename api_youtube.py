@@ -13,7 +13,7 @@ class VideoRequest(BaseModel):
 @router.post("/info-youtube")
 async def info_youtube(request: VideoRequest):
     try:
-        ydl_opts = {'quiet': True}
+        ydl_opts = {'quiet': True, 'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
             return {
@@ -29,7 +29,6 @@ async def download_youtube(request: VideoRequest):
     os.makedirs("downloads", exist_ok=True)
     final_filepath = f"downloads/{file_id}.mp4"
     
-    # Kaliteye göre format ayarı
     format_opt = 'best[ext=mp4]/best'
     if request.quality == '720p':
         format_opt = 'best[height<=720][ext=mp4]/best'
@@ -39,11 +38,17 @@ async def download_youtube(request: VideoRequest):
     ydl_opts = {
         'quiet': True,
         'format': format_opt,
+        'format_sort': ['vcodec:h264', 'vcodec:avc1', 'acodec:aac'],
         'outtmpl': final_filepath,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([request.url])
+            
+        if not os.path.exists(final_filepath) or os.path.getsize(final_filepath) < 30000:
+            raise Exception("Bozuk dosya")
+            
         return FileResponse(final_filepath, media_type="video/mp4", filename="yt_video.mp4")
     except Exception:
         raise HTTPException(status_code=400, detail="YouTube indirme başarısız.")

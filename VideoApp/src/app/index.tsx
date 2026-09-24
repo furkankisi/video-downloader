@@ -16,13 +16,11 @@ export default function App() {
   const [isLoadingInfo, setIsLoadingInfo] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false); 
   
-  // Önizleme bilgileri
   const [videoInfo, setVideoInfo] = useState<{ title: string; thumbnail: string } | null>(null);
-  const [selectedQuality, setSelectedQuality] = useState('best'); // YouTube için kalite
+  const [selectedQuality, setSelectedQuality] = useState('best'); 
 
   const scrollX = useRef(new Animated.Value(0)).current;
 
-  // Kesintisiz Arka Plan Animasyonu
   useEffect(() => {
     const startAnimation = () => {
       scrollX.setValue(0);
@@ -36,10 +34,28 @@ export default function App() {
     startAnimation();
   }, []);
 
-  // LİNK YAPIŞTIRILINCA VEYA DEĞİŞTİRİLİNCE OTOMATİK ALGILAMA VE BİLGİ ÇEKME
+  // SEKME DEĞİŞTİRME KONTROLÜ (Link varken yanlış sekmeye geçişi engeller)
+  const handleTabPress = (targetPlatform: string) => {
+    if (url.trim().length > 0) {
+      let linkPlatform = activePlatform;
+      if (url.includes('instagram.com')) linkPlatform = 'instagram';
+      else if (url.includes('youtube.com') || url.includes('youtu.be')) linkPlatform = 'youtube';
+      else if (url.includes('tiktok.com')) linkPlatform = 'tiktok';
+
+      if (targetPlatform !== linkPlatform) {
+        Alert.alert(
+          "İşlem Engellendi", 
+          `Yapıştırdığınız link bir ${linkPlatform.toUpperCase()} linkidir. Önce linki silmeli veya doğru sekmede kalmalısınız!`
+        );
+        return; // Sekme değişimine kesinlikle izin vermez!
+      }
+    }
+    setActivePlatform(targetPlatform);
+  };
+
   const handleUrlChange = async (text: string) => {
     setUrl(text);
-    setVideoInfo(null); // Yeni link girilince önizlemeyi sıfırla
+    setVideoInfo(null); 
 
     if (!text.includes('http')) return;
 
@@ -48,16 +64,10 @@ export default function App() {
     else if (text.includes('youtube.com') || text.includes('youtu.be')) detected = 'youtube';
     else if (text.includes('tiktok.com')) detected = 'tiktok';
 
-    // Eğer kullanıcının seçili sekmesi ile link uyuşmuyorsa uyar ve değiştir
     if (detected !== activePlatform) {
-      Alert.alert(
-        "Platform Değiştirildi", 
-        `Yapıştırdığınız link bir ${detected.toUpperCase()} videosuna ait. Sekme otomatik olarak değiştirildi.`
-      );
       setActivePlatform(detected);
     }
 
-    // Bilgileri (Önizleme) Backend'den Çek
     setIsLoadingInfo(true);
     try {
       const response = await fetch(`${API_BASE}/info-${detected}`, {
@@ -85,7 +95,6 @@ export default function App() {
     }
   };
 
-  // İNDİRME İŞLEMİ
   const handleDownload = async () => {
     if (!url) {
       Alert.alert("Uyarı", "Lütfen önce bir video linki yapıştırın.");
@@ -133,7 +142,7 @@ export default function App() {
         
         if (result && result.status !== 200) {
           await FileSystem.deleteAsync(result.uri, { idempotent: true });
-          throw new Error("Video indirilemedi.");
+          throw new Error("Video indirilemedi veya dosya bozuk.");
         }
 
         if (result && result.uri) {
@@ -152,7 +161,6 @@ export default function App() {
   return (
     <View style={styles.container}>
       
-      {/* Arka Plan Kayan Logolar */}
       <View style={styles.backgroundWrapper}>
         <Animated.View style={[styles.movingBackground, { transform: [{ translateX: scrollX }] }]}>
           {[...Array(8)].map((_, i) => (
@@ -170,31 +178,30 @@ export default function App() {
           
           <Text style={styles.title}>VideoSaver <Text style={styles.proBadge}>PRO</Text></Text>
 
-          {/* Platform Seçici */}
+          {/* Koruma Altına Alınmış Platform Seçici */}
           <View style={styles.platformSelector}>
             <TouchableOpacity 
               style={[styles.platformBtn, activePlatform === 'instagram' && styles.activeInstagram]}
-              onPress={() => setActivePlatform('instagram')}
+              onPress={() => handleTabPress('instagram')}
             >
               <FontAwesome5 name="instagram" size={26} color={activePlatform === 'instagram' ? '#FFF' : '#64748B'} />
             </TouchableOpacity>
 
             <TouchableOpacity 
               style={[styles.platformBtn, activePlatform === 'youtube' && styles.activeYoutube]}
-              onPress={() => setActivePlatform('youtube')}
+              onPress={() => handleTabPress('youtube')}
             >
               <FontAwesome5 name="youtube" size={26} color={activePlatform === 'youtube' ? '#FFF' : '#64748B'} />
             </TouchableOpacity>
 
             <TouchableOpacity 
               style={[styles.platformBtn, activePlatform === 'tiktok' && styles.activeTiktok]}
-              onPress={() => setActivePlatform('tiktok')}
+              onPress={() => handleTabPress('tiktok')}
             >
               <FontAwesome5 name="tiktok" size={26} color={activePlatform === 'tiktok' ? '#FFF' : '#64748B'} />
             </TouchableOpacity>
           </View>
 
-          {/* Input ve Yapıştır İkonu */}
           <View style={styles.inputWrapper}>
             <TextInput
               style={styles.input}
@@ -216,7 +223,6 @@ export default function App() {
             </View>
           )}
 
-          {/* VİDEO DOĞRULAMA (ÖNİZLEME KARTI) */}
           {videoInfo && !isLoadingInfo && (
             <View style={styles.previewCard}>
               {videoInfo.thumbnail ? (
@@ -226,7 +232,6 @@ export default function App() {
             </View>
           )}
 
-          {/* YOUTUBE İÇİN KALİTE SEÇİCİ */}
           {activePlatform === 'youtube' && videoInfo && (
             <View style={styles.qualityContainer}>
               <Text style={styles.qualityLabel}>Kalite Seç:</Text>
@@ -242,7 +247,6 @@ export default function App() {
             </View>
           )}
 
-          {/* İNDİR BUTONU (Sadece video bilgisi gelince aktifleşir veya görünür) */}
           {videoInfo && (
             <TouchableOpacity 
               style={[
