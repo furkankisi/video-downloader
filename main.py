@@ -6,10 +6,6 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import yt_dlp
-import imageio_ffmpeg
-
-# Arka plandaki dönüştürücü motorumuz
-ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
 
 app = FastAPI(title="Instagram İndirici (Kesin Apple Uyumlu)")
 
@@ -53,22 +49,20 @@ async def download_video(request: VideoRequest):
     file_id = str(uuid.uuid4())
     os.makedirs("downloads", exist_ok=True)
     
-    # yt-dlp'nin dosyayı işlerken kullanacağı geçici isim
     out_template = f"downloads/{file_id}.%(ext)s"
     final_filepath = f"downloads/{file_id}.mp4"
     
     ydl_opts = {
-        'quiet': False, # Hataları görebilmek için açık bıraktık
-        'format': 'bestvideo+bestaudio/best', # En iyi görüntü ve sesi al
-        'merge_output_format': 'mp4', # MP4 kılıfına sok
+        'quiet': False,
+        'format': 'bestvideo+bestaudio/best', 
+        'merge_output_format': 'mp4',
         'outtmpl': out_template,
-        'ffmpeg_location': ffmpeg_path, # Motoru bağla
+        # yt-dlp sistemi tarayıp ffmpeg motorunu kendisi otomatik bulacak
         'postprocessors': [{
             'key': 'FFmpegVideoConvertor',
             'preferedformat': 'mp4',
         }],
-        # İŞTE MAC'TE SES OLARAK AÇILMASINI ENGELLEYEN O SİHİRLİ KOD:
-        # "Video kodeğini zorla Apple'ın H.264'ü yap, Sesi de AAC yap"
+        # Mac ve iPhone'da kesin açılması için zorunlu H.264/AAC kodek emri
         'postprocessor_args': [
             '-c:v', 'libx264',
             '-c:a', 'aac',
