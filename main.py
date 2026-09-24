@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import yt_dlp
 
-app = FastAPI(title="Instagram İndirici (VP9 Yasaklı)")
+app = FastAPI(title="Instagram İndirici (Akıllı Sıralama)")
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,9 +53,11 @@ async def download_video(request: VideoRequest):
     
     ydl_opts = {
         'quiet': False, 
-        # İŞTE MAC'İ ÇILDIRTAN VP9'U TAMAMEN YASAKLAYAN O KOD:
-        # "Sadece avc1 (H.264) getir, eğer yoksa içinde 'vp' geçmeyen başka bir MP4 getir!"
-        'format': 'best[ext=mp4][vcodec^=avc1]/best[ext=mp4][vcodec!*=vp]', 
+        'format': 'best[ext=mp4]/best', 
+        # İŞTE BÜTÜN SORUNLARI ÇÖZEN YENİ SİHİRLİ KOD:
+        # "Yasaklamak" yerine "Tercih Et" diyoruz. 
+        # yt-dlp'ye Mac'in sevdiği H.264 (avc1) ve AAC formatlarını en başa almasını söylüyoruz.
+        'format_sort': ['vcodec:h264', 'vcodec:avc1', 'acodec:aac'],
         'outtmpl': final_filepath,
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
     }
@@ -64,10 +66,11 @@ async def download_video(request: VideoRequest):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([clean_link])
 
-        if not os.path.exists(final_filepath) or os.path.getsize(final_filepath) < 100000:
+        # Çok kısa (1-2 saniyelik) videoları engellememek için güvenlik barajını 30KB'a düşürdük
+        if not os.path.exists(final_filepath) or os.path.getsize(final_filepath) < 30000:
             if os.path.exists(final_filepath):
                 os.remove(final_filepath)
-            raise HTTPException(status_code=400, detail="Video indirilemedi.")
+            raise HTTPException(status_code=400, detail="Video indirilemedi veya engellendi.")
 
         return FileResponse(final_filepath, media_type="video/mp4", filename="ig_video.mp4")
         
