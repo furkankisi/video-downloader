@@ -73,7 +73,6 @@ const API_BASE = 'https://video-downloader-cvtw.onrender.com'; // CANLI RENDER A
         const dir = (FileSystem as any).documentDirectory || 'file:///var/mobile/';
         const fileUri = `${dir}video_${Date.now()}.mp4`;
 
-        // TypeScript'i susturan kesin çözüm
         const downloadOptions: any = {
           httpMethod: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -88,15 +87,23 @@ const API_BASE = 'https://video-downloader-cvtw.onrender.com'; // CANLI RENDER A
 
         const result = await downloadResumable.downloadAsync();
         
+        // --- İŞTE HAYAT KURTARAN YENİ KONTROL ---
+        // Sunucudan başarılı video gelmediyse, inen sahte bozuk dosyayı sil ve hata ver
+        if (result && result.status !== 200) {
+          await FileSystem.deleteAsync(result.uri, { idempotent: true });
+          throw new Error("Instagram videoyu vermedi veya link hatalı.");
+        }
+        // -----------------------------------------
+
         if (result && result.uri) {
           if (await Sharing.isAvailableAsync()) {
             await Sharing.shareAsync(result.uri);
           }
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      Alert.alert("Hata", "Video indirilirken bir sorun oluştu.");
+      Alert.alert("Hata", error.message || "Video indirilirken bir sorun oluştu.");
     } finally {
       setIsDownloading(false);
     }
