@@ -18,8 +18,8 @@ async def info_youtube(request: VideoRequest):
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-            'extractor_args': {'youtube': {'player_client': ['web_safari', 'ios', 'android']}}
+            'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+            'extractor_args': {'youtube': {'player_client': ['ios']}}
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
@@ -50,8 +50,8 @@ async def download_youtube(request: VideoRequest):
         'merge_output_format': 'mp4',
         'ffmpeg_location': ffmpeg_path,
         'outtmpl': final_filepath,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-        'extractor_args': {'youtube': {'player_client': ['web_safari', 'ios', 'android']}}
+        'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+        'extractor_args': {'youtube': {'player_client': ['ios']}}
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
