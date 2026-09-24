@@ -10,33 +10,15 @@ class VideoRequest(BaseModel):
     url: str
     quality: str = "best"
 
-def get_cookie_path():
-    # Dosyanın olduğu klasör ve bir üst klasörde cookies.txt arar (Yol hatasını 0'a indirir)
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    paths_to_check = [
-        os.path.join(current_dir, "cookies.txt"),
-        os.path.join(os.path.dirname(current_dir), "cookies.txt"),
-        "cookies.txt"
-    ]
-    for p in paths_to_check:
-        if os.path.exists(p):
-            print(f"✔ Cookies bulundu: {p}")
-            return p
-    print("❌ DİKKAT: cookies.txt bulunamadı!")
-    return None
-
 @router.post("/info-youtube")
 async def info_youtube(request: VideoRequest):
     try:
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            'extractor_args': {'youtube': {'player_client': ['ios', 'android']}}
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
         }
-        cookie_file = get_cookie_path()
-        if cookie_file:
-            ydl_opts['cookiefile'] = cookie_file
-
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
             return {
@@ -64,13 +46,9 @@ async def download_youtube(request: VideoRequest):
         'no_warnings': True,
         'format': format_opt,
         'outtmpl': final_filepath,
-        'extractor_args': {'youtube': {'player_client': ['ios', 'android']}}
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
     }
-    
-    cookie_file = get_cookie_path()
-    if cookie_file:
-        ydl_opts['cookiefile'] = cookie_file
-
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([request.url])
@@ -81,4 +59,4 @@ async def download_youtube(request: VideoRequest):
         return FileResponse(final_filepath, media_type="video/mp4", filename="yt_video.mp4")
     except Exception as e:
         print("YouTube İndirme Hatası:", e)
-        raise HTTPException(status_code=400, detail="YouTube indirilemedi. Cookies veya linki kontrol edin.")
+        raise HTTPException(status_code=400, detail="YouTube indirme başarısız.")

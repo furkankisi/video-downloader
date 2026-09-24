@@ -9,26 +9,14 @@ router = APIRouter()
 class VideoRequest(BaseModel):
     url: str
 
-def get_cookie_path():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    paths_to_check = [
-        os.path.join(current_dir, "cookies.txt"),
-        os.path.join(os.path.dirname(current_dir), "cookies.txt"),
-        "cookies.txt"
-    ]
-    for p in paths_to_check:
-        if os.path.exists(p):
-            return p
-    return None
-
 @router.post("/info-tiktok")
 async def info_tiktok(request: VideoRequest):
     try:
-        ydl_opts = {'quiet': True, 'no_warnings': True}
-        cookie_file = get_cookie_path()
-        if cookie_file:
-            ydl_opts['cookiefile'] = cookie_file
-
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+        }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
             return {
@@ -50,12 +38,8 @@ async def download_tiktok(request: VideoRequest):
         'no_warnings': True,
         'format': 'best[ext=mp4]/best',
         'outtmpl': final_filepath,
+        'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
     }
-    
-    cookie_file = get_cookie_path()
-    if cookie_file:
-        ydl_opts['cookiefile'] = cookie_file
-
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([request.url])
@@ -66,4 +50,4 @@ async def download_tiktok(request: VideoRequest):
         return FileResponse(final_filepath, media_type="video/mp4", filename="tiktok_video.mp4")
     except Exception as e:
         print("TikTok İndirme Hatası:", e)
-        raise HTTPException(status_code=400, detail="TikTok indirilemedi.")
+        raise HTTPException(status_code=400, detail="TikTok indirme başarısız.")
