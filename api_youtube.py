@@ -1,5 +1,6 @@
 import httpx
 import yt_dlp
+import imageio_ffmpeg
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -7,29 +8,26 @@ from starlette.background import BackgroundTask
 
 from common import (
     MIN_FILE_SIZE, base_ydl_opts, cleanup_cookiefile, extract_url, find_output,
-    friendly_error, new_output_path, remove_files_with_stem,
+    friendly_error, new_output_path, remove_files_with_stem, set_youtube_clients,
 )
 
 router = APIRouter()
 
-# ÖNEMLİ: player_client'ı elle 'web_creator','mweb','web' yapmak YouTube'u bozuyordu; bu istemciler
-# PO Token olmadan akış URL'i veremiyor. Varsayılanı (yt-dlp'nin kendi seçimi) kullanıyoruz,
-# olmazsa sırayla alternatif istemcileri deniyoruz.
+# FFmpeg yolunu otomatik alıyoruz (Render / Sunucu uyumlu)
+ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+
 CLIENT_CHAINS = [
-    None,                                # yt-dlp varsayılanı (şu an: visionos, web)
+    None,                                
     ["android_vr"],
     ["tv_downgraded", "web_embedded"],
 ]
-
 
 class VideoRequest(BaseModel):
     url: str
     quality: str = "best"
 
-
 def build_format(quality: str) -> str:
-    """Tek dosya (progressive) YouTube'da artık neredeyse yok; video+ses ayrı indirilip ffmpeg ile birleşir."""
-    cap = {"720p": 720, "360p": 360}.get(quality, 1080)  # 'best' = 1080p (sunucu RAM/disk koruması)
+    cap = {"720p": 720, "360p": 360}.get(quality, 1080)
     h = f"[height<={cap}]"
     return (
         f"bv*{h}[ext=mp4][vcodec^=avc1]+ba[ext=m4a]/"
@@ -38,33 +36,27 @@ def build_format(quality: str) -> str:
         f"bv*{h}+ba/b{h}/b"
     )
 
-
 def _oembed(url: str) -> dict:
-    """Bot kontrolüne takılmayan hafif önizleme (başlık + kapak)."""
     r = httpx.get("https://www.youtube.com/oembed", params={"url": url, "format": "json"}, timeout=10)
     r.raise_for_status()
     d = r.json()
     return {"title": d.get("title", "YouTube Videosu"), "thumbnail": d.get("thumbnail_url", "")}
 
-
 @router.post("/info-youtube")
 def info_youtube(request: VideoRequest):
     url = extract_url(request.url)
 
-    # 1) Hızlı ve engellenmeyen yol
     try:
         return _oembed(url)
     except Exception as e:
         print("YouTube oEmbed başarısız:", e)
 
-    # 2) yt-dlp ile dene
     last = None
     for clients in CLIENT_CHAINS:
         opts = base_ydl_opts("youtube")
-        opts["ignore_no_formats_error"] = True   # sadece başlık/kapak lazım, format hatası önemsiz
+        opts["ignore_no_formats_error"] = True   
         opts["skip_download"] = True
-        if clients:
-            opts["extractor_args"] = {"youtube": {"player_client": clients}}
+        set_youtube_clients(opts, clients)
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -75,7 +67,6 @@ def info_youtube(request: VideoRequest):
         finally:
             cleanup_cookiefile(opts)
     raise HTTPException(status_code=400, detail=friendly_error(last, "YouTube"))
-
 
 @router.post("/download-youtube")
 def download_youtube(request: VideoRequest):
@@ -88,8 +79,8 @@ def download_youtube(request: VideoRequest):
         opts = base_ydl_opts("youtube")
         opts["format"] = fmt
         opts["outtmpl"] = str(out.with_suffix("")) + ".%(ext)s"
-        if clients:
-            opts["extractor_args"] = {"youtube": {"player_client": clients}}
+        opts["ffmpeg_location"] = ffmpeg_path  # FFmpeg motoru buraya bağlandı!
+        set_youtube_clients(opts, clients)
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
