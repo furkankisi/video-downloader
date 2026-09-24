@@ -16,7 +16,8 @@ async def info_youtube(request: VideoRequest):
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            'socket_timeout': 30,
+            'geo_bypass': True,
+            'nocheckcertificate': True,
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
             'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
         }
@@ -28,7 +29,6 @@ async def info_youtube(request: VideoRequest):
             }
     except Exception as e:
         print("YouTube Bilgi Hatası:", e)
-        # 400 hatası döndürüp sistemi kilitlemek yerine yedek obje döndürüyoruz
         return {
             "title": "YouTube Videosu",
             "thumbnail": ""
@@ -49,6 +49,8 @@ async def download_youtube(request: VideoRequest):
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
+        'geo_bypass': True,
+        'nocheckcertificate': True,
         'format': format_opt,
         'outtmpl': final_filepath,
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
@@ -64,4 +66,4 @@ async def download_youtube(request: VideoRequest):
         return FileResponse(final_filepath, media_type="video/mp4", filename="yt_video.mp4")
     except Exception as e:
         print("YouTube İndirme Hatası:", e)
-        raise HTTPException(status_code=400, detail="YouTube indirme başarısız.")
+        raise HTTPException(status_code=400, detail="YouTube videosu indirilemedi.")

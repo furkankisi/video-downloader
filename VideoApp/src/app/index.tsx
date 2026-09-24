@@ -82,6 +82,7 @@ export default function App() {
       }
     } catch (e) {
       console.log("Önizleme alınamadı", e);
+      setVideoInfo({ title: "Video Hazır", thumbnail: "" });
     } finally {
       setIsLoadingInfo(false);
     }
@@ -148,7 +149,7 @@ export default function App() {
         
         if (result && result.status !== 200) {
           await FileSystem.deleteAsync(result.uri, { idempotent: true });
-          throw new Error("Video indirilemedi veya dosya bozuk.");
+          throw new Error("Video indirilemedi veya sunucu engelledi.");
         }
 
         if (result && result.uri) {
@@ -223,21 +224,28 @@ export default function App() {
             </View>
           )}
 
-          {/* Sabit Boyutlu Önizleme Kartı */}
-          {videoInfo && !isLoadingInfo && (
+          {/* Önizleme Kartı (Thumbnail yoksa şık bir ikon gösterir) */}
+          {url.length > 5 && !isLoadingInfo && (
             <View style={styles.previewCard}>
-              {videoInfo.thumbnail ? (
+              {videoInfo?.thumbnail ? (
                 <Image source={{ uri: videoInfo.thumbnail }} style={styles.thumbnail} resizeMode="cover" />
-              ) : null}
+              ) : (
+                <View style={styles.fallbackThumbnail}>
+                  <FontAwesome5 name={activePlatform} size={40} color="#00F2FE" />
+                  <Text style={styles.fallbackText}>{activePlatform.toUpperCase()} Videosu</Text>
+                </View>
+              )}
               <View style={styles.titleContainer}>
                 <Ionicons name="checkmark-circle" size={20} color="#10B981" style={{ marginRight: 6 }} />
-                <Text style={styles.videoTitle} numberOfLines={2}>{videoInfo.title}</Text>
+                <Text style={styles.videoTitle} numberOfLines={2}>
+                  {videoInfo?.title || `${activePlatform.toUpperCase()} Bağlantısı Hazır`}
+                </Text>
               </View>
             </View>
           )}
 
           {/* YouTube Kalite Seçici */}
-          {activePlatform === 'youtube' && !isYoutubeShort && videoInfo && (
+          {activePlatform === 'youtube' && !isYoutubeShort && url.length > 5 && (
             <View style={styles.qualityContainer}>
               <Text style={styles.qualityLabel}>Kalite Seç:</Text>
               {['best', '720p', '360p'].map((q) => (
@@ -252,8 +260,8 @@ export default function App() {
             </View>
           )}
 
-          {/* İndir Butonu */}
-          {videoInfo && (
+          {/* İndir Butonu (Link girildiği an aktif olur) */}
+          {url.length > 5 && (
             <TouchableOpacity 
               style={[
                 styles.downloadBtn, 
@@ -284,11 +292,8 @@ export default function App() {
         <Animated.View style={[styles.movingBackground, { transform: [{ translateX: scrollX }] }]}>
           {[...Array(8)].map((_, i) => (
             <View key={i} style={styles.logoRow}>
-              {/* Instagram: Gerçek Logo + Pembe Neon Dış Parıltı */}
               <FontAwesome5 name="instagram" size={45} color="#FFFFFF" style={styles.neonInsta} />
-              {/* YouTube: Gerçek Logo + Kırmızı Neon Dış Parıltı */}
               <FontAwesome5 name="youtube" size={45} color="#FFFFFF" style={styles.neonYoutube} />
-              {/* TikTok: Gerçek Logo + Pembe Neon Dış Parıltı */}
               <FontAwesome5 name="tiktok" size={45} color="#FFFFFF" style={styles.neonTiktok} />
             </View>
           ))}
@@ -306,7 +311,6 @@ const styles = StyleSheet.create({
   movingBackground: { flexDirection: 'row', width: 4000 },
   logoRow: { flexDirection: 'row', alignItems: 'center' },
   
-  // Gerçek Logolar ve Dış Neon Parıltı Efektleri (textShadow)
   neonInsta: { marginHorizontal: 35, textShadowColor: '#E1306C', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
   neonYoutube: { marginHorizontal: 35, textShadowColor: '#FF0000', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
   neonTiktok: { marginHorizontal: 35, textShadowColor: '#FF0050', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
@@ -331,6 +335,8 @@ const styles = StyleSheet.create({
   
   previewCard: { width: '100%', backgroundColor: '#0F101A', borderRadius: 20, padding: 14, borderWidth: 1, borderColor: '#00F2FE', marginBottom: 20, alignItems: 'center', shadowColor: '#00F2FE', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 },
   thumbnail: { width: '100%', height: 140, borderRadius: 12, marginBottom: 12, backgroundColor: '#1E2238' },
+  fallbackThumbnail: { width: '100%', height: 100, borderRadius: 12, marginBottom: 12, backgroundColor: '#161B2E', justifyContent: 'center', alignItems: 'center' },
+  fallbackText: { color: '#94A3B8', fontSize: 12, marginTop: 6, fontWeight: '600' },
   titleContainer: { flexDirection: 'row', alignItems: 'center', width: '100%', paddingHorizontal: 4 },
   videoTitle: { color: '#F8FAFC', fontSize: 14, fontWeight: '600', flex: 1 },
   
