@@ -279,17 +279,17 @@ export default function App() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* EN ALTTA NEON RENKLİ KAYAN ANİMASYON ŞERİDİ (Insta: Pembe, YT: Kırmızı, TikTok: Pembe) */}
+      {/* EN ALTTA GERÇEK LOGOLU VE DIŞI NEON PARLAYAN ANİMASYON ŞERİDİ */}
       <View style={styles.bottomAnimationContainer} pointerEvents="none">
         <Animated.View style={[styles.movingBackground, { transform: [{ translateX: scrollX }] }]}>
           {[...Array(8)].map((_, i) => (
             <View key={i} style={styles.logoRow}>
-              {/* Instagram: Pembe Neon */}
-              <FontAwesome5 name="instagram" size={50} color="rgba(233, 30, 99, 0.4)" style={styles.bgIcon} />
-              {/* YouTube: Kırmızı Neon */}
-              <FontAwesome5 name="youtube" size={50} color="rgba(255, 0, 0, 0.4)" style={styles.bgIcon} />
-              {/* TikTok: Pembe Neon */}
-              <FontAwesome5 name="tiktok" size={50} color="rgba(255, 0, 80, 0.4)" style={styles.bgIcon} />
+              {/* Instagram: Gerçek Logo + Pembe Neon Dış Parıltı */}
+              <FontAwesome5 name="instagram" size={45} color="#FFFFFF" style={styles.neonInsta} />
+              {/* YouTube: Gerçek Logo + Kırmızı Neon Dış Parıltı */}
+              <FontAwesome5 name="youtube" size={45} color="#FFFFFF" style={styles.neonYoutube} />
+              {/* TikTok: Gerçek Logo + Pembe Neon Dış Parıltı */}
+              <FontAwesome5 name="tiktok" size={45} color="#FFFFFF" style={styles.neonTiktok} />
             </View>
           ))}
         </Animated.View>
@@ -305,7 +305,11 @@ const styles = StyleSheet.create({
   bottomAnimationContainer: { position: 'absolute', bottom: 10, left: 0, right: 0, height: 60, justifyContent: 'center', overflow: 'hidden' },
   movingBackground: { flexDirection: 'row', width: 4000 },
   logoRow: { flexDirection: 'row', alignItems: 'center' },
-  bgIcon: { marginHorizontal: 40 },
+  
+  // Gerçek Logolar ve Dış Neon Parıltı Efektleri (textShadow)
+  neonInsta: { marginHorizontal: 35, textShadowColor: '#E1306C', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
+  neonYoutube: { marginHorizontal: 35, textShadowColor: '#FF0000', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
+  neonTiktok: { marginHorizontal: 35, textShadowColor: '#FF0050', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
 
   content: { flex: 1, zIndex: 1, marginBottom: 70 }, 
   scrollArea: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40, alignItems: 'center' },
@@ -314,7 +318,6 @@ const styles = StyleSheet.create({
   platformSelector: { flexDirection: 'row', backgroundColor: '#0F101A', borderRadius: 20, padding: 8, marginBottom: 25, width: '100%', justifyContent: 'space-between', borderWidth: 1, borderColor: '#1E2238' },
   platformBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14 },
   
-  // İstediğin Neon Renkler ve Çerçeveler (Insta: Pembe, YT: Kırmızı, TikTok: Pembe)
   activeInstagram: { backgroundColor: '#E1306C', borderWidth: 1.5, borderColor: '#FF70A6', shadowColor: '#E1306C', elevation: 12, shadowOpacity: 0.8, shadowRadius: 10 },
   activeYoutube: { backgroundColor: '#FF0000', borderWidth: 1.5, borderColor: '#FF6666', shadowColor: '#FF0000', elevation: 12, shadowOpacity: 0.8, shadowRadius: 10 },
   activeTiktok: { backgroundColor: '#FF0050', borderWidth: 1.5, borderColor: '#FF758C', shadowColor: '#FF0050', elevation: 12, shadowOpacity: 0.8, shadowRadius: 12 },
