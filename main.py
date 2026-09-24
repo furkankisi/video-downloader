@@ -1,23 +1,19 @@
 import os
 import uuid
 import uvicorn
-import subprocess
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import yt_dlp
-import imageio_ffmpeg
 
-# Evrensel dönüştürücü motorun yolu
-ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+app = FastAPI(title="Instagram İndirici (Hızlı ve Uyumlu)")
 
-app = FastAPI(title="Instagram İndirici (Kesin Çözüm)")
-
+# Güvenlik ve CORS ayarları tam optimize edildi (allow_credentials=False yapıldı)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -46,7 +42,7 @@ async def get_info(request: VideoRequest):
                 "thumbnail": info.get("thumbnail", ""),
             }
     except Exception:
-        raise HTTPException(status_code=400, detail="Video bulunamadı.")
+        raise HTTPException(status_code=400, detail="Video bulunamadı. Gizli hesap veya yanlış link.")
 
 @app.post("/download-video")
 async def download_video(request: VideoRequest):
@@ -54,47 +50,31 @@ async def download_video(request: VideoRequest):
     file_id = str(uuid.uuid4())
     os.makedirs("downloads", exist_ok=True)
     
-    # 1. Aşama: Instagram'ın verdiği orijinal dosyayı olduğu gibi (raw) indiriyoruz
-    raw_output = f"downloads/{file_id}_raw.%(ext)s"
+    output_template = f"downloads/{file_id}.mp4"
     
     ydl_opts = {
         'quiet': True,
-        'format': 'best',
-        'outtmpl': raw_output,
+        # SİHİRLİ KOD: 
+        # vcodec^=avc1 -> "Bana Instagram'ın hazır Apple (H.264) versiyonunu getir"
+        # acodec!=none -> "İçinde kesinlikle SES olsun"
+        'format': 'best[vcodec^=avc1][acodec!=none]/best[ext=mp4][acodec!=none]/best',
+        'outtmpl': output_template,
         'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(clean_link, download=True)
-            downloaded_ext = info_dict.get('ext', 'mp4')
-            
-        raw_filepath = f"downloads/{file_id}_raw.{downloaded_ext}"
-        final_filepath = f"downloads/{file_id}_final.mp4"
-        
-        # 2. Aşama: MUTLAK ÇÖZÜM - FFmpeg ile dosyayı zorla Mac/iPhone uyumlu (H.264/AAC) yapıyoruz
-        command = [
-            ffmpeg_path,
-            "-y",               # Üzerine yazma izni
-            "-i", raw_filepath, # İnen orijinal dosya
-            "-c:v", "libx264",  # Mac'in istediği Video Kodeği (H.264)
-            "-c:a", "aac",      # Mac'in istediği Ses Kodeği (AAC)
-            "-preset", "fast",  # Dönüştürmeyi hızlandır
-            final_filepath      # Çıktı dosyası
-        ]
-        
-        # Dönüştürme işlemini başlat
-        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        
-        # 3. Aşama: Çevrilen ve %100 Apple uyumlu olan dosyayı kullanıcıya gönder
-        if os.path.exists(final_filepath):
-            return FileResponse(final_filepath, media_type="video/mp4", filename="ig_video.mp4")
-        else:
-            raise Exception("Çevirme işlemi başarısız.")
-            
+            ydl.download([clean_link])
+
+        downloaded_file = f"downloads/{file_id}.mp4"
+
+        if not os.path.exists(downloaded_file):
+            raise HTTPException(status_code=400, detail="Dosya oluşturulamadı.")
+
+        return FileResponse(downloaded_file, media_type="video/mp4", filename="ig_video.mp4")
     except Exception as e:
-        print("İndirme/Çevirme Hatası:", e)
-        raise HTTPException(status_code=400, detail="Video indirilemedi veya dönüştürülemedi.")
+        print("İndirme Hatası:", e)
+        raise HTTPException(status_code=400, detail="Video indirilemedi.")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
