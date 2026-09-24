@@ -25,7 +25,10 @@ async def info_tiktok(request: VideoRequest):
             }
     except Exception as e:
         print("TikTok Bilgi Hatası:", e)
-        raise HTTPException(status_code=400, detail="TikTok bilgileri alınamadı.")
+        return {
+            "title": "TikTok Videosu",
+            "thumbnail": ""
+        }
 
 @router.post("/download-tiktok")
 async def download_tiktok(request: VideoRequest):

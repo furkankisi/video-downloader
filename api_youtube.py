@@ -16,8 +16,9 @@ async def info_youtube(request: VideoRequest):
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
+            'socket_timeout': 30,
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-            'extractor_args': {'youtube': {'player_client': ['ios', 'web']}}
+            'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
@@ -27,7 +28,11 @@ async def info_youtube(request: VideoRequest):
             }
     except Exception as e:
         print("YouTube Bilgi Hatası:", e)
-        raise HTTPException(status_code=400, detail="YouTube bilgileri alınamadı.")
+        # 400 hatası döndürüp sistemi kilitlemek yerine yedek obje döndürüyoruz
+        return {
+            "title": "YouTube Videosu",
+            "thumbnail": ""
+        }
 
 @router.post("/download-youtube")
 async def download_youtube(request: VideoRequest):
@@ -35,7 +40,6 @@ async def download_youtube(request: VideoRequest):
     os.makedirs("downloads", exist_ok=True)
     final_filepath = f"downloads/{file_id}.mp4"
     
-    # Sunucuyu yormayan, direkt tek parça MP4 indiren sağlam format
     format_opt = 'best[ext=mp4]/best'
     if request.quality == '720p':
         format_opt = 'best[height<=720][ext=mp4]/best'
@@ -48,7 +52,7 @@ async def download_youtube(request: VideoRequest):
         'format': format_opt,
         'outtmpl': final_filepath,
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-        'extractor_args': {'youtube': {'player_client': ['ios', 'web']}}
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
