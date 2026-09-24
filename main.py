@@ -52,6 +52,8 @@ def debug(url: str = ""):
         "proxy_ayarli": bool(os.getenv("PROXY_URL")),
         "cerez_ayarli": bool(os.getenv("YT_COOKIES_B64") or os.getenv("YT_COOKIES_FILE")),
     }
+    from common import pot_server_home
+    report["po_token_saglayici"] = pot_server_home() or "KURULU DEGIL (build_pot.sh calismamis)"
     try:
         import curl_cffi  # noqa: F401
         report["curl_cffi"] = True

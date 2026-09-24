@@ -4,3 +4,4 @@ pydantic
 httpx
 yt-dlp[default,curl-cffi,deno]
 imageio-ffmpeg
+bgutil-ytdlp-pot-provider==2.0.0

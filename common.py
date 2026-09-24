@@ -135,7 +135,29 @@ def base_ydl_opts(platform: str = "") -> dict:
         ck = _cookie_source("YT_COOKIES_B64", "YT_COOKIES_FILE")
         if ck:
             opts["cookiefile"] = ck
+        home = pot_server_home()
+        if home:
+            # PO Token üretici (bgutil, script modu). Client listesi ayrı 'youtube' anahtarında verilir.
+            opts["extractor_args"] = {"youtubepot-bgutilscript": {"server_home": [home]}}
     return opts
+
+
+def pot_server_home() -> Optional[str]:
+    """build_pot.sh ile kurulan bgutil sağlayıcısının yolu (yoksa None)."""
+    candidates = [
+        os.getenv("BGUTIL_HOME"),
+        str(Path(__file__).resolve().parent / "bgutil-ytdlp-pot-provider" / "server"),
+    ]
+    for c in candidates:
+        if c and (Path(c) / "build" / "generate_once.js").exists():
+            return c
+    return None
+
+
+def set_youtube_clients(opts: dict, clients) -> None:
+    """player_client'ı, PO Token ayarlarını ezmeden ekle."""
+    if clients:
+        opts.setdefault("extractor_args", {})["youtube"] = {"player_client": clients}
 
 
 def try_impersonate(opts: dict) -> dict:
