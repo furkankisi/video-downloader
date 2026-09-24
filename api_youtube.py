@@ -13,14 +13,18 @@ class VideoRequest(BaseModel):
 @router.post("/info-youtube")
 async def info_youtube(request: VideoRequest):
     try:
-        ydl_opts = {'quiet': True, 'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        ydl_opts = {
+            'quiet': True,
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
             return {
                 "title": info.get("title", "YouTube Videosu"),
                 "thumbnail": info.get("thumbnail", "")
             }
-    except Exception:
+    except Exception as e:
+        print("YouTube Bilgi Hatası:", e)
         raise HTTPException(status_code=400, detail="YouTube bilgileri alınamadı.")
 
 @router.post("/download-youtube")

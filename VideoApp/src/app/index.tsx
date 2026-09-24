@@ -34,7 +34,6 @@ export default function App() {
     startAnimation();
   }, []);
 
-  // SEKME DEĞİŞTİRME KONTROLÜ (Link varken yanlış sekmeye geçişi engeller)
   const handleTabPress = (targetPlatform: string) => {
     if (url.trim().length > 0) {
       let linkPlatform = activePlatform;
@@ -45,9 +44,9 @@ export default function App() {
       if (targetPlatform !== linkPlatform) {
         Alert.alert(
           "İşlem Engellendi", 
-          `Yapıştırdığınız link bir ${linkPlatform.toUpperCase()} linkidir. Önce linki silmeli veya doğru sekmede kalmalısınız!`
+          `Yapıştırdığınız link bir ${linkPlatform.toUpperCase()} linkidir. Lütfen önce linki temizleyin!`
         );
-        return; // Sekme değişimine kesinlikle izin vermez!
+        return;
       }
     }
     setActivePlatform(targetPlatform);
@@ -93,6 +92,11 @@ export default function App() {
     } else {
       Alert.alert("Hata", "Panoda yapıştırılacak bir şey yok.");
     }
+  };
+
+  const handleClear = () => {
+    setUrl('');
+    setVideoInfo(null);
   };
 
   const handleDownload = async () => {
@@ -161,13 +165,14 @@ export default function App() {
   return (
     <View style={styles.container}>
       
+      {/* Arka Plan Kayan Logolar */}
       <View style={styles.backgroundWrapper}>
         <Animated.View style={[styles.movingBackground, { transform: [{ translateX: scrollX }] }]}>
           {[...Array(8)].map((_, i) => (
             <View key={i} style={styles.logoRow}>
-              <FontAwesome5 name="instagram" size={90} color="rgba(255,255,255,0.06)" style={styles.bgIcon} />
-              <FontAwesome5 name="youtube" size={90} color="rgba(255,255,255,0.06)" style={styles.bgIcon} />
-              <FontAwesome5 name="tiktok" size={90} color="rgba(255,255,255,0.06)" style={styles.bgIcon} />
+              <FontAwesome5 name="instagram" size={90} color="rgba(0, 242, 254, 0.08)" style={styles.bgIcon} />
+              <FontAwesome5 name="youtube" size={90} color="rgba(255, 0, 80, 0.08)" style={styles.bgIcon} />
+              <FontAwesome5 name="tiktok" size={90} color="rgba(255, 255, 255, 0.08)" style={styles.bgIcon} />
             </View>
           ))}
         </Animated.View>
@@ -178,7 +183,7 @@ export default function App() {
           
           <Text style={styles.title}>VideoSaver <Text style={styles.proBadge}>PRO</Text></Text>
 
-          {/* Koruma Altına Alınmış Platform Seçici */}
+          {/* Platform Seçici (Neon Stil) */}
           <View style={styles.platformSelector}>
             <TouchableOpacity 
               style={[styles.platformBtn, activePlatform === 'instagram' && styles.activeInstagram]}
@@ -198,11 +203,17 @@ export default function App() {
               style={[styles.platformBtn, activePlatform === 'tiktok' && styles.activeTiktok]}
               onPress={() => handleTabPress('tiktok')}
             >
-              <FontAwesome5 name="tiktok" size={26} color={activePlatform === 'tiktok' ? '#FFF' : '#64748B'} />
+              <FontAwesome5 name="tiktok" size={26} color={activePlatform === 'tiktok' ? '#111' : '#64748B'} />
             </TouchableOpacity>
           </View>
 
+          {/* Input ve X / Yapıştır Butonları */}
           <View style={styles.inputWrapper}>
+            {url.length > 0 && (
+              <TouchableOpacity style={styles.clearBtn} onPress={handleClear}>
+                <Ionicons name="close-circle" size={22} color="#EF4444" />
+              </TouchableOpacity>
+            )}
             <TextInput
               style={styles.input}
               placeholder={`${activePlatform.toUpperCase()} linkini yapıştırın...`}
@@ -212,26 +223,31 @@ export default function App() {
               editable={!isDownloading}
             />
             <TouchableOpacity style={styles.pasteBtn} onPress={handlePaste} disabled={isDownloading}>
-              <Ionicons name="clipboard-outline" size={24} color="#94A3B8" />
+              <Ionicons name="clipboard-outline" size={24} color="#00F2FE" />
             </TouchableOpacity>
           </View>
 
           {isLoadingInfo && (
             <View style={styles.loadingInfoContainer}>
               <ActivityIndicator color="#00F2FE" size="small" />
-              <Text style={styles.loadingInfoText}>Video bilgileri alınıyor...</Text>
+              <Text style={styles.loadingInfoText}>Video taranıyor...</Text>
             </View>
           )}
 
+          {/* Dengeli ve Kullanıcı Dostu Önizleme Kartı */}
           {videoInfo && !isLoadingInfo && (
             <View style={styles.previewCard}>
               {videoInfo.thumbnail ? (
-                <Image source={{ uri: videoInfo.thumbnail }} style={styles.thumbnail} />
+                <Image source={{ uri: videoInfo.thumbnail }} style={styles.thumbnail} resizeMode="cover" />
               ) : null}
-              <Text style={styles.videoTitle} numberOfLines={2}>{videoInfo.title}</Text>
+              <View style={styles.titleContainer}>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" style={{ marginRight: 6 }} />
+                <Text style={styles.videoTitle} numberOfLines={2}>{videoInfo.title}</Text>
+              </View>
             </View>
           )}
 
+          {/* YouTube Kalite Seçici (Neon) */}
           {activePlatform === 'youtube' && videoInfo && (
             <View style={styles.qualityContainer}>
               <Text style={styles.qualityLabel}>Kalite Seç:</Text>
@@ -241,19 +257,20 @@ export default function App() {
                   style={[styles.qualityBtn, selectedQuality === q && styles.activeQualityBtn]}
                   onPress={() => setSelectedQuality(q)}
                 >
-                  <Text style={[styles.qualityText, selectedQuality === q && {color: '#FFF'}]}>{q.toUpperCase()}</Text>
+                  <Text style={[styles.qualityText, selectedQuality === q && {color: '#FFF', fontWeight: 'bold'}]}>{q.toUpperCase()}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           )}
 
+          {/* İndir Butonu */}
           {videoInfo && (
             <TouchableOpacity 
               style={[
                 styles.downloadBtn, 
-                activePlatform === 'instagram' && { backgroundColor: '#E1306C' },
-                activePlatform === 'youtube' && { backgroundColor: '#FF0000' },
-                activePlatform === 'tiktok' && { backgroundColor: '#00F2FE' },
+                activePlatform === 'instagram' && styles.btnInstagram,
+                activePlatform === 'youtube' && styles.btnYoutube,
+                activePlatform === 'tiktok' && styles.btnTiktok,
                 isDownloading && { opacity: 0.7 }
               ]} 
               onPress={handleDownload}
@@ -277,33 +294,45 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0B0F19' },
-  backgroundWrapper: { position: 'absolute', top: '15%', left: 0, right: 0, bottom: 0, overflow: 'hidden' },
+  container: { flex: 1, backgroundColor: '#05050A' },
+  backgroundWrapper: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', overflow: 'hidden' },
   movingBackground: { flexDirection: 'row', width: 4000 },
   logoRow: { flexDirection: 'row', alignItems: 'center' },
   bgIcon: { marginHorizontal: 45 },
   content: { flex: 1, zIndex: 1 },
-  scrollArea: { paddingHorizontal: 24, paddingTop: 60, alignItems: 'center', paddingBottom: 40 },
-  title: { fontSize: 36, fontWeight: '900', color: '#FFFFFF', letterSpacing: 1, marginBottom: 30, textAlign: 'center' },
+  scrollArea: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40, alignItems: 'center' },
+  title: { fontSize: 36, fontWeight: '900', color: '#FFFFFF', letterSpacing: 1.5, marginBottom: 30, textAlign: 'center', textShadowColor: '#00F2FE', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 },
   proBadge: { fontSize: 16, color: '#00F2FE', fontWeight: 'bold' },
-  platformSelector: { flexDirection: 'row', backgroundColor: '#1E293B', borderRadius: 20, padding: 8, marginBottom: 25, width: '100%', justifyContent: 'space-between' },
+  platformSelector: { flexDirection: 'row', backgroundColor: '#0F101A', borderRadius: 20, padding: 8, marginBottom: 25, width: '100%', justifyContent: 'space-between', borderWidth: 1, borderColor: '#1E2238' },
   platformBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14 },
-  activeInstagram: { backgroundColor: '#E1306C', shadowColor: '#E1306C', elevation: 10, shadowOpacity: 0.4, shadowRadius: 8 },
-  activeYoutube: { backgroundColor: '#FF0000', shadowColor: '#FF0000', elevation: 10, shadowOpacity: 0.4, shadowRadius: 8 },
-  activeTiktok: { backgroundColor: '#25F4EE', shadowColor: '#25F4EE', elevation: 10, shadowOpacity: 0.4, shadowRadius: 8 },
-  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1E293B', borderRadius: 16, borderWidth: 1, borderColor: '#334155', marginBottom: 15, paddingHorizontal: 16, width: '100%' },
+  
+  // Neon Platform Aktif Renkler
+  activeInstagram: { backgroundColor: '#E1306C', shadowColor: '#E1306C', elevation: 12, shadowOpacity: 0.6, shadowRadius: 10 },
+  activeYoutube: { backgroundColor: '#FF0000', shadowColor: '#FF0000', elevation: 12, shadowOpacity: 0.6, shadowRadius: 10 },
+  activeTiktok: { backgroundColor: '#FFFFFF', shadowColor: '#FF0050', elevation: 12, shadowOpacity: 0.8, shadowRadius: 12 }, // Beyaz ve Pembe (TikTok)
+
+  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0F101A', borderRadius: 16, borderWidth: 1, borderColor: '#2A2F4C', marginBottom: 20, paddingHorizontal: 16, width: '100%', shadowColor: '#00F2FE', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5 },
+  clearBtn: { marginRight: 10 },
   input: { flex: 1, paddingVertical: 18, color: '#F8FAFC', fontSize: 16 },
   pasteBtn: { padding: 10 },
   loadingInfoContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  loadingInfoText: { color: '#94A3B8', marginLeft: 8, fontSize: 14 },
-  previewCard: { width: '100%', backgroundColor: '#1E293B', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#334155', marginBottom: 20, alignItems: 'center' },
-  thumbnail: { width: '100%', height: 180, borderRadius: 12, marginBottom: 12 },
-  videoTitle: { color: '#F8FAFC', fontSize: 15, fontWeight: '600', textAlign: 'center' },
-  qualityContainer: { flexDirection: 'row', width: '100%', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, backgroundColor: '#1E293B', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#334155' },
+  loadingInfoText: { color: '#00F2FE', marginLeft: 8, fontSize: 14, fontWeight: '600' },
+  
+  // Dengeli ve Şık Önizleme Kartı
+  previewCard: { width: '100%', backgroundColor: '#0F101A', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#00F2FE', marginBottom: 20, alignItems: 'center', shadowColor: '#00F2FE', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 },
+  thumbnail: { width: '100%', height: 200, borderRadius: 14, marginBottom: 14, backgroundColor: '#1E2238' },
+  titleContainer: { flexDirection: 'row', alignItems: 'center', width: '100%', paddingHorizontal: 4 },
+  videoTitle: { color: '#F8FAFC', fontSize: 15, fontWeight: '600', flex: 1 },
+  
+  qualityContainer: { flexDirection: 'row', width: '100%', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, backgroundColor: '#0F101A', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#2A2F4C' },
   qualityLabel: { color: '#94A3B8', fontWeight: 'bold', fontSize: 14 },
-  qualityBtn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8, backgroundColor: '#0B0F19' },
-  activeQualityBtn: { backgroundColor: '#FF0000' },
-  qualityText: { color: '#94A3B8', fontWeight: 'bold', fontSize: 12 },
-  downloadBtn: { flexDirection: 'row', width: '100%', paddingVertical: 18, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  qualityBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#1E2238' },
+  activeQualityBtn: { backgroundColor: '#FF0000', shadowColor: '#FF0000', shadowOpacity: 0.5, shadowRadius: 6, elevation: 5 },
+  qualityText: { color: '#94A3B8', fontSize: 12 },
+  
+  downloadBtn: { flexDirection: 'row', width: '100%', paddingVertical: 18, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8 },
+  btnInstagram: { backgroundColor: '#E1306C', shadowColor: '#E1306C' },
+  btnYoutube: { backgroundColor: '#FF0000', shadowColor: '#FF0000' },
+  btnTiktok: { backgroundColor: '#FF0050', shadowColor: '#FF0050' }, // Neon Pembe İndir Butonu
   downloadBtnText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', letterSpacing: 0.5 }
 });

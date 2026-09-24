@@ -12,14 +12,18 @@ class VideoRequest(BaseModel):
 @router.post("/info-tiktok")
 async def info_tiktok(request: VideoRequest):
     try:
-        ydl_opts = {'quiet': True, 'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        ydl_opts = {
+            'quiet': True,
+            'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+        }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
             return {
                 "title": info.get("title", "TikTok Videosu"),
                 "thumbnail": info.get("thumbnail", "")
             }
-    except Exception:
+    except Exception as e:
+        print("TikTok Bilgi Hatası:", e)
         raise HTTPException(status_code=400, detail="TikTok bilgileri alınamadı.")
 
 @router.post("/download-tiktok")
@@ -33,7 +37,7 @@ async def download_tiktok(request: VideoRequest):
         'format': 'best[ext=mp4]/best',
         'format_sort': ['vcodec:h264', 'vcodec:avc1', 'acodec:aac'],
         'outtmpl': final_filepath,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
