@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import yt_dlp
 
-app = FastAPI(title="Instagram İndirici (Net Çözüm)")
+app = FastAPI(title="Instagram İndirici (Net MP4)")
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,48 +31,48 @@ async def get_info(request: VideoRequest):
     ydl_opts = {
         'quiet': True,
         'skip_download': True,
-        # Yeniden Masaüstü kimliğine geçtik (Parçalı mobil yayınlardan kaçmak için)
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(clean_link, download=False)
             return {
-                "title": info.get("title") or info.get("description") or "Instagram Videosu",
+                "title": info.get("title", "Instagram Videosu"),
                 "thumbnail": info.get("thumbnail", ""),
             }
     except Exception:
-        raise HTTPException(status_code=400, detail="Video bulunamadı. Gizli hesap veya yanlış link.")
+        raise HTTPException(status_code=400, detail="Video bulunamadı.")
 
 @app.post("/download-video")
 async def download_video(request: VideoRequest):
     clean_link = clean_ig_url(request.url)
     file_id = str(uuid.uuid4())
     os.makedirs("downloads", exist_ok=True)
-    
-    output_template = f"downloads/{file_id}.mp4"
+    final_filepath = f"downloads/{file_id}.mp4"
     
     ydl_opts = {
         'quiet': True,
-        # ANAHTAR NOKTA: protocol=https
-        # FFmpeg gerektiren parçalı m3u8 yayınlarını kesinlikle reddediyoruz.
-        # Sadece doğrudan indirilebilir, kendinden sesli orijinal MP4 dosyasını alıyoruz.
-        'format': 'best[ext=mp4][protocol=https]',
-        'outtmpl': output_template,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
+        # Doğrudan MP4 konteyneri olan orijinal dosyayı zorluyoruz
+        'format': 'best[ext=mp4]',
+        'outtmpl': final_filepath,
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([clean_link])
 
-        downloaded_file = f"downloads/{file_id}.mp4"
+        if not os.path.exists(final_filepath) or os.path.getsize(final_filepath) < 50000:
+            if os.path.exists(final_filepath):
+                os.remove(final_filepath)
+            raise HTTPException(status_code=400, detail="Geçersiz dosya, indirme engellendi.")
 
-        # GÜVENLİK KONTROLÜ: İnen dosya 50KB'dan küçükse (bozuk/sahte dosyaysa) iptal et
-        if not os.path.exists(downloaded_file) or os.path.getsize(downloaded_file) < 50000:
-            raise HTTPException(status_code=400, detail="Geçersiz dosya. Instagram bu videoyu engelledi.")
-
-        return FileResponse(downloaded_file, media_type="video/mp4", filename="ig_video.mp4")
+        return FileResponse(final_filepath, media_type="video/mp4", filename="ig_video.mp4")
+        
     except Exception as e:
         print("İndirme Hatası:", e)
         raise HTTPException(status_code=400, detail="Video indirilemedi.")
