@@ -8,25 +8,27 @@ import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
-// KENDİ BACKEND ADRESİN (Lokalde deniyorsan http://127.0.0.1:8000 yap)
 const API_BASE = "https://video-downloader-cvtw.onrender.com"; 
 
 export default function App() {
   const [url, setUrl] = useState('');
   const [activePlatform, setActivePlatform] = useState('instagram'); 
-  const [isDownloading, setIsDownloading] = useState(false); // Yükleniyor animasyonu için
+  const [isDownloading, setIsDownloading] = useState(false); 
   
   const scrollX = useRef(new Animated.Value(0)).current;
 
+  // SONSUZ VE KESİNTİSİZ ANİMASYON DÖNGÜSÜ
   useEffect(() => {
-    Animated.loop(
+    const startAnimation = () => {
+      scrollX.setValue(0);
       Animated.timing(scrollX, {
-        toValue: -1000, 
-        duration: 25000, 
+        toValue: -1200, // Logoların kayma mesafesi
+        duration: 30000, // 30 saniye sürsün (Yavaş ve premium)
         easing: Easing.linear,
         useNativeDriver: true,
-      })
-    ).start();
+      }).start(() => startAnimation()); // Bitince kendini tekrar başlat!
+    };
+    startAnimation();
   }, []);
 
   const handlePaste = async () => {
@@ -38,7 +40,6 @@ export default function App() {
     }
   };
 
-  // GERÇEK İNDİRME FONKSİYONU
   const handleDownload = async () => {
     if (!url) {
       Alert.alert("Uyarı", "Lütfen önce bir video linki yapıştırın.");
@@ -48,8 +49,8 @@ export default function App() {
     setIsDownloading(true);
 
     try {
-      // Şimdilik hepsi aynı backend'e gidiyor, modüler sisteme geçince ayıracağız
-      const endpoint = `${API_BASE}/download-video`;
+      // DİNAMİK YÖNLENDİRME: Hangi platform seçiliyse onun dosyasına gider!
+      const endpoint = `${API_BASE}/download-${activePlatform}`;
 
       if (Platform.OS === 'web') {
         const response = await fetch(endpoint, {
@@ -64,14 +65,14 @@ export default function App() {
         const blobUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = blobUrl;
-        a.download = `video_${Date.now()}.mp4`;
+        a.download = `${activePlatform}_video_${Date.now()}.mp4`;
         document.body.appendChild(a);
         a.click();
         a.remove();
         window.URL.revokeObjectURL(blobUrl);
       } else {
         const dir = (FileSystem as any).documentDirectory || 'file:///var/mobile/';
-        const fileUri = `${dir}video_${Date.now()}.mp4`;
+        const fileUri = `${dir}${activePlatform}_video_${Date.now()}.mp4`;
 
         const downloadOptions: any = {
           httpMethod: 'POST',
@@ -79,17 +80,12 @@ export default function App() {
           body: JSON.stringify({ url: url }),
         };
 
-        const downloadResumable = FileSystem.createDownloadResumable(
-          endpoint,
-          fileUri,
-          downloadOptions
-        );
-
+        const downloadResumable = FileSystem.createDownloadResumable(endpoint, fileUri, downloadOptions);
         const result = await downloadResumable.downloadAsync();
         
         if (result && result.status !== 200) {
           await FileSystem.deleteAsync(result.uri, { idempotent: true });
-          throw new Error("Video indirilemedi. Gizli hesap veya hatalı link olabilir.");
+          throw new Error(`${activePlatform.toUpperCase()} videosu indirilemedi. Linki kontrol edin.`);
         }
 
         if (result && result.uri) {
@@ -109,13 +105,14 @@ export default function App() {
   return (
     <View style={styles.container}>
       
+      {/* HAREKETLİ ARKA PLAN (Daha görünür ve ortalandı) */}
       <View style={styles.backgroundWrapper}>
         <Animated.View style={[styles.movingBackground, { transform: [{ translateX: scrollX }] }]}>
-          {[...Array(6)].map((_, i) => (
+          {[...Array(8)].map((_, i) => (
             <View key={i} style={styles.logoRow}>
-              <FontAwesome5 name="instagram" size={80} color="rgba(255,255,255,0.03)" style={styles.bgIcon} />
-              <FontAwesome5 name="youtube" size={80} color="rgba(255,255,255,0.03)" style={styles.bgIcon} />
-              <FontAwesome5 name="tiktok" size={80} color="rgba(255,255,255,0.03)" style={styles.bgIcon} />
+              <FontAwesome5 name="instagram" size={90} color="rgba(255,255,255,0.06)" style={styles.bgIcon} />
+              <FontAwesome5 name="youtube" size={90} color="rgba(255,255,255,0.06)" style={styles.bgIcon} />
+              <FontAwesome5 name="tiktok" size={90} color="rgba(255,255,255,0.06)" style={styles.bgIcon} />
             </View>
           ))}
         </Animated.View>
@@ -168,7 +165,7 @@ export default function App() {
             activePlatform === 'instagram' && { backgroundColor: '#E1306C' },
             activePlatform === 'youtube' && { backgroundColor: '#FF0000' },
             activePlatform === 'tiktok' && { backgroundColor: '#00F2FE' },
-            isDownloading && { opacity: 0.7 } // İnerken buton rengi hafif solar
+            isDownloading && { opacity: 0.7 }
           ]} 
           onPress={handleDownload}
           disabled={isDownloading}
@@ -196,23 +193,22 @@ const styles = StyleSheet.create({
   },
   backgroundWrapper: {
     position: 'absolute',
-    top: 0,
+    top: '15%', // BİR TIK AŞAĞI ALINDI VE ORTALANDI
     left: 0,
     right: 0,
     bottom: 0,
     overflow: 'hidden',
-    justifyContent: 'center',
   },
   movingBackground: {
     flexDirection: 'row',
-    width: 3000,
+    width: 4000,
   },
   logoRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   bgIcon: {
-    marginHorizontal: 40,
+    marginHorizontal: 45,
   },
   content: {
     paddingHorizontal: 24,
