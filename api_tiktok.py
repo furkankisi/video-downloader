@@ -9,23 +9,27 @@ router = APIRouter()
 class VideoRequest(BaseModel):
     url: str
 
-def get_ydl_opts():
-    opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'geo_bypass': True,
-        'nocheckcertificate': True,
-        'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-    }
-    if os.path.exists('cookies.txt'):
-        opts['cookiefile'] = 'cookies.txt'
-    return opts
+def get_cookie_path():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    paths_to_check = [
+        os.path.join(current_dir, "cookies.txt"),
+        os.path.join(os.path.dirname(current_dir), "cookies.txt"),
+        "cookies.txt"
+    ]
+    for p in paths_to_check:
+        if os.path.exists(p):
+            return p
+    return None
 
 @router.post("/info-tiktok")
 async def info_tiktok(request: VideoRequest):
     try:
-        opts = get_ydl_opts()
-        with yt_dlp.YoutubeDL(opts) as ydl:
+        ydl_opts = {'quiet': True, 'no_warnings': True}
+        cookie_file = get_cookie_path()
+        if cookie_file:
+            ydl_opts['cookiefile'] = cookie_file
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
             return {
                 "title": info.get("title", "TikTok Videosu"),
@@ -41,12 +45,19 @@ async def download_tiktok(request: VideoRequest):
     os.makedirs("downloads", exist_ok=True)
     final_filepath = f"downloads/{file_id}.mp4"
     
-    opts = get_ydl_opts()
-    opts['format'] = 'best[ext=mp4]/best'
-    opts['outtmpl'] = final_filepath
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'format': 'best[ext=mp4]/best',
+        'outtmpl': final_filepath,
+    }
+    
+    cookie_file = get_cookie_path()
+    if cookie_file:
+        ydl_opts['cookiefile'] = cookie_file
 
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([request.url])
             
         if not os.path.exists(final_filepath) or os.path.getsize(final_filepath) < 30000:
@@ -55,4 +66,4 @@ async def download_tiktok(request: VideoRequest):
         return FileResponse(final_filepath, media_type="video/mp4", filename="tiktok_video.mp4")
     except Exception as e:
         print("TikTok İndirme Hatası:", e)
-        raise HTTPException(status_code=400, detail="TikTok videosu indirilemedi.")
+        raise HTTPException(status_code=400, detail="TikTok indirilemedi.")
