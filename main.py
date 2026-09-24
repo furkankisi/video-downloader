@@ -7,9 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import yt_dlp
 
-app = FastAPI(title="Instagram İndirici (Hızlı ve Uyumlu)")
+app = FastAPI(title="Instagram İndirici (Net Çözüm)")
 
-# Güvenlik ve CORS ayarları tam optimize edildi (allow_credentials=False yapıldı)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,7 +31,8 @@ async def get_info(request: VideoRequest):
     ydl_opts = {
         'quiet': True,
         'skip_download': True,
-        'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+        # Yeniden Masaüstü kimliğine geçtik (Parçalı mobil yayınlardan kaçmak için)
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -54,12 +54,12 @@ async def download_video(request: VideoRequest):
     
     ydl_opts = {
         'quiet': True,
-        # SİHİRLİ KOD: 
-        # vcodec^=avc1 -> "Bana Instagram'ın hazır Apple (H.264) versiyonunu getir"
-        # acodec!=none -> "İçinde kesinlikle SES olsun"
-        'format': 'best[vcodec^=avc1][acodec!=none]/best[ext=mp4][acodec!=none]/best',
+        # ANAHTAR NOKTA: protocol=https
+        # FFmpeg gerektiren parçalı m3u8 yayınlarını kesinlikle reddediyoruz.
+        # Sadece doğrudan indirilebilir, kendinden sesli orijinal MP4 dosyasını alıyoruz.
+        'format': 'best[ext=mp4][protocol=https]',
         'outtmpl': output_template,
-        'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
     }
     
     try:
@@ -68,8 +68,9 @@ async def download_video(request: VideoRequest):
 
         downloaded_file = f"downloads/{file_id}.mp4"
 
-        if not os.path.exists(downloaded_file):
-            raise HTTPException(status_code=400, detail="Dosya oluşturulamadı.")
+        # GÜVENLİK KONTROLÜ: İnen dosya 50KB'dan küçükse (bozuk/sahte dosyaysa) iptal et
+        if not os.path.exists(downloaded_file) or os.path.getsize(downloaded_file) < 50000:
+            raise HTTPException(status_code=400, detail="Geçersiz dosya. Instagram bu videoyu engelledi.")
 
         return FileResponse(downloaded_file, media_type="video/mp4", filename="ig_video.mp4")
     except Exception as e:
