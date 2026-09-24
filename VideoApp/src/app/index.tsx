@@ -124,8 +124,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#0B0F19', // Çok premium koyu lacivert/siyah
     justifyContent: 'center',
   },
-  backgroundWrapper: {
-    ...StyleSheet.absoluteFillObject,
+ backgroundWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     overflow: 'hidden',
     justifyContent: 'center',
   },
