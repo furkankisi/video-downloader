@@ -1,204 +1,214 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert, Image, Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  StyleSheet, Text, View, TextInput, TouchableOpacity, 
+  Animated, Easing, KeyboardAvoidingView, Platform, Alert
+} from 'react-native';
+import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 
 export default function App() {
   const [url, setUrl] = useState('');
-  const [videoInfo, setVideoInfo] = useState<{ title: string; thumbnail: string } | null>(null);
-  const [isLoadingInfo, setIsLoadingInfo] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [activePlatform, setActivePlatform] = useState('instagram'); // instagram, youtube, tiktok
+  
+  // Arka plan animasyonu için değer
+  const scrollX = useRef(new Animated.Value(0)).current;
 
-  // const API_BASE = 'http://127.0.0.1:8000'; // BUNU SİL VEYA YORUMA AL
-const API_BASE = 'https://video-downloader-cvtw.onrender.com'; // CANLI RENDER ADRESİN
+  // Arka plandaki logoların sonsuz akması için animasyon döngüsü
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(scrollX, {
+        toValue: -1000, // Ne kadar uzağa kayacağı
+        duration: 25000, // Kayma hızı (25 saniye)
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, []);
 
+  // Panodan link yapıştırma fonksiyonu
   const handlePaste = async () => {
-    try {
-      const text = await Clipboard.getStringAsync();
-      if (text) setUrl(text);
-    } catch (error) {
-      Alert.alert("Hata", "Panodan kopyalanamadı.");
+    const text = await Clipboard.getStringAsync();
+    if (text) {
+      setUrl(text);
+    } else {
+      Alert.alert("Hata", "Panoda yapıştırılacak bir şey yok.");
     }
   };
 
-  const handleFetchInfo = async () => {
-    if (!url) return Alert.alert("Hata", "Lütfen bir link girin.");
-    
-    setIsLoadingInfo(true);
-    setVideoInfo(null);
-    
-    try {
-      const response = await fetch(`${API_BASE}/get-info`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || "Video bulunamadı.");
-      
-      setVideoInfo({ title: data.title, thumbnail: data.thumbnail });
-    } catch (error: any) {
-      Alert.alert("Hata", error.message);
-    } finally {
-      setIsLoadingInfo(false);
-    }
-  };
-
-  const handleDownload = async () => {
-    if (!url) return;
-    setIsDownloading(true);
-
-    try {
-      if (Platform.OS === 'web') {
-        const response = await fetch(`${API_BASE}/download-video`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: url }),
-        });
-        
-        if (!response.ok) throw new Error("İndirme başarısız.");
-        
-        const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = `video_${Date.now()}.mp4`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(blobUrl);
-      } else {
-        const dir = (FileSystem as any).documentDirectory || 'file:///var/mobile/';
-        const fileUri = `${dir}video_${Date.now()}.mp4`;
-
-        const downloadOptions: any = {
-          httpMethod: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: url }),
-        };
-
-        const downloadResumable = FileSystem.createDownloadResumable(
-          `${API_BASE}/download-video`,
-          fileUri,
-          downloadOptions
-        );
-
-        const result = await downloadResumable.downloadAsync();
-        
-        // --- İŞTE HAYAT KURTARAN YENİ KONTROL ---
-        // Sunucudan başarılı video gelmediyse, inen sahte bozuk dosyayı sil ve hata ver
-        if (result && result.status !== 200) {
-          await FileSystem.deleteAsync(result.uri, { idempotent: true });
-          throw new Error("Instagram videoyu vermedi veya link hatalı.");
-        }
-        // -----------------------------------------
-
-        if (result && result.uri) {
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(result.uri);
-          }
-        }
-      }
-    } catch (error: any) {
-      console.error(error);
-      Alert.alert("Hata", error.message || "Video indirilirken bir sorun oluştu.");
-    } finally {
-      setIsDownloading(false);
-    }
+  const handleDownload = () => {
+    Alert.alert("Bilgi", `Arka plan (Backend) bağlandığında ${activePlatform.toUpperCase()} videosu inecek!`);
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Video İndirici</Text>
-        <Text style={styles.subtitle}>Bağlantıyı yapıştır, önizlemeyi gör ve tek tıkla en yüksek kalitede indir.</Text>
+      
+      {/* 1. HAREKETLİ ARKA PLAN (Kayan Logolar) */}
+      <View style={styles.backgroundWrapper}>
+        <Animated.View style={[styles.movingBackground, { transform: [{ translateX: scrollX }] }]}>
+          {/* Döngüsel hissiyat için logoları çoğalttık */}
+          {[...Array(6)].map((_, i) => (
+            <View key={i} style={styles.logoRow}>
+              <FontAwesome5 name="instagram" size={80} color="rgba(255,255,255,0.03)" style={styles.bgIcon} />
+              <FontAwesome5 name="youtube" size={80} color="rgba(255,255,255,0.03)" style={styles.bgIcon} />
+              <FontAwesome5 name="tiktok" size={80} color="rgba(255,255,255,0.03)" style={styles.bgIcon} />
+            </View>
+          ))}
+        </Animated.View>
+      </View>
 
-        <View style={styles.inputContainer}>
-          <TextInput 
-            style={styles.input} 
-            placeholder="Video bağlantısını yapıştır..." 
-            placeholderTextColor="#94a3b8"
-            value={url}
-            onChangeText={setUrl}
-          />
-          <TouchableOpacity style={styles.pasteButton} onPress={handlePaste}>
-            <Text style={styles.pasteButtonText}>Yapıştır</Text>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.content}>
+        
+        {/* BAŞLIK */}
+        <Text style={styles.title}>VideoSaver <Text style={styles.proBadge}>PRO</Text></Text>
+
+        {/* 2. PLATFORM SEÇİCİ (Üst Kısım) */}
+        <View style={styles.platformSelector}>
+          <TouchableOpacity 
+            style={[styles.platformBtn, activePlatform === 'instagram' && styles.activeInstagram]}
+            onPress={() => setActivePlatform('instagram')}
+          >
+            <FontAwesome5 name="instagram" size={28} color={activePlatform === 'instagram' ? '#FFF' : '#64748B'} />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.platformBtn, activePlatform === 'youtube' && styles.activeYoutube]}
+            onPress={() => setActivePlatform('youtube')}
+          >
+            <FontAwesome5 name="youtube" size={28} color={activePlatform === 'youtube' ? '#FFF' : '#64748B'} />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.platformBtn, activePlatform === 'tiktok' && styles.activeTiktok]}
+            onPress={() => setActivePlatform('tiktok')}
+          >
+            <FontAwesome5 name="tiktok" size={28} color={activePlatform === 'tiktok' ? '#FFF' : '#64748B'} />
           </TouchableOpacity>
         </View>
 
-        {!videoInfo && (
-          <TouchableOpacity 
-            style={[styles.button, isLoadingInfo && styles.buttonDisabled]} 
-            onPress={handleFetchInfo}
-            disabled={isLoadingInfo}
-          >
-            {isLoadingInfo ? (
-              <View style={styles.loadingRow}>
-                <ActivityIndicator color="#fff" style={{ marginRight: 8 }} />
-                <Text style={styles.buttonText}>Bilgiler Alınıyor...</Text>
-              </View>
-            ) : (
-              <Text style={styles.buttonText}>Videoyu Getir 🔍</Text>
-            )}
+        {/* 3. INPUT VE YAPIŞTIRMA İKONU */}
+        <View style={styles.inputWrapper}>
+          <TextInput
+            style={styles.input}
+            placeholder={`${activePlatform.toUpperCase()} linkini buraya girin...`}
+            placeholderTextColor="#64748B"
+            value={url}
+            onChangeText={setUrl}
+          />
+          <TouchableOpacity style={styles.pasteBtn} onPress={handlePaste}>
+            <Ionicons name="clipboard-outline" size={24} color="#94A3B8" />
           </TouchableOpacity>
-        )}
+        </View>
 
-        {videoInfo && (
-          <View style={styles.previewContainer}>
-            <View style={styles.videoInfoBox}>
-              {videoInfo.thumbnail ? (
-                <Image source={{ uri: videoInfo.thumbnail }} style={styles.thumbnail} />
-              ) : null}
-              <Text style={styles.videoTitle} numberOfLines={2}>{videoInfo.title}</Text>
-            </View>
+        {/* ANA İNDİR BUTONU */}
+        <TouchableOpacity 
+          style={[
+            styles.downloadBtn, 
+            activePlatform === 'instagram' && { backgroundColor: '#E1306C' },
+            activePlatform === 'youtube' && { backgroundColor: '#FF0000' },
+            activePlatform === 'tiktok' && { backgroundColor: '#00F2FE' },
+          ]} 
+          onPress={handleDownload}
+        >
+          <Ionicons name="cloud-download-outline" size={24} color="white" style={{ marginRight: 8 }} />
+          <Text style={styles.downloadBtnText}>Videoyu Bul ve İndir</Text>
+        </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[styles.button, isDownloading && styles.buttonDisabled]} 
-              onPress={handleDownload}
-              disabled={isDownloading}
-            >
-              {isDownloading ? (
-                <View style={styles.loadingRow}>
-                  <ActivityIndicator color="#fff" style={{ marginRight: 8 }} />
-                  <Text style={styles.buttonText}>İndiriliyor...</Text>
-                </View>
-              ) : (
-                <Text style={styles.buttonText}>En Yüksek Kalitede İndir 🚀</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.resetBtn} 
-              onPress={() => { setVideoInfo(null); setUrl(''); }}
-            >
-              <Text style={styles.resetText}>Başka Video İndir</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#090d16', padding: 20 },
-  card: { width: '100%', maxWidth: 500, backgroundColor: 'rgba(30, 41, 59, 0.95)', padding: 30, borderRadius: 20, borderWidth: 1, borderColor: '#334155' },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginBottom: 5, textAlign: 'center' },
-  subtitle: { fontSize: 13, color: '#94a3b8', marginBottom: 20, textAlign: 'center' },
-  inputContainer: { position: 'relative', marginBottom: 15 },
-  input: { backgroundColor: '#0f172a', color: '#fff', padding: 15, paddingRight: 80, borderRadius: 10, borderWidth: 1, borderColor: '#334155' },
-  pasteButton: { position: 'absolute', right: 5, top: 5, bottom: 5, backgroundColor: '#334155', justifyContent: 'center', paddingHorizontal: 15, borderRadius: 8 },
-  pasteButtonText: { color: '#fff', fontWeight: 'bold' },
-  button: { backgroundColor: '#6366f1', padding: 15, borderRadius: 10, alignItems: 'center' },
-  buttonDisabled: { opacity: 0.7 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  loadingRow: { flexDirection: 'row', alignItems: 'center' },
-  previewContainer: { marginTop: 10 },
-  videoInfoBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f172a', padding: 10, borderRadius: 10, marginBottom: 15 },
-  thumbnail: { width: 60, height: 60, borderRadius: 8, marginRight: 10, backgroundColor: '#334155' },
-  videoTitle: { flex: 1, color: '#fff', fontSize: 14 },
-  resetBtn: { marginTop: 15, alignItems: 'center' },
-  resetText: { color: '#94a3b8', textDecorationLine: 'underline' }
+  container: {
+    flex: 1,
+    backgroundColor: '#0B0F19', // Çok premium koyu lacivert/siyah
+    justifyContent: 'center',
+  },
+  backgroundWrapper: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+    justifyContent: 'center',
+  },
+  movingBackground: {
+    flexDirection: 'row',
+    width: 3000,
+  },
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  bgIcon: {
+    marginHorizontal: 40,
+  },
+  content: {
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    zIndex: 1, // Animasyonun üstünde durması için
+  },
+  title: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 1,
+    marginBottom: 40,
+  },
+  proBadge: {
+    fontSize: 16,
+    color: '#00F2FE',
+    fontWeight: 'bold',
+  },
+  platformSelector: {
+    flexDirection: 'row',
+    backgroundColor: '#1E293B',
+    borderRadius: 20,
+    padding: 8,
+    marginBottom: 30,
+    width: '100%',
+    justifyContent: 'space-between',
+  },
+  platformBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  activeInstagram: { backgroundColor: '#E1306C', shadowColor: '#E1306C', elevation: 10, shadowOpacity: 0.4, shadowRadius: 8 },
+  activeYoutube: { backgroundColor: '#FF0000', shadowColor: '#FF0000', elevation: 10, shadowOpacity: 0.4, shadowRadius: 8 },
+  activeTiktok: { backgroundColor: '#25F4EE', shadowColor: '#25F4EE', elevation: 10, shadowOpacity: 0.4, shadowRadius: 8 },
+  
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#334155',
+    marginBottom: 20,
+    paddingHorizontal: 16,
+    width: '100%',
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 18,
+    color: '#F8FAFC',
+    fontSize: 16,
+  },
+  pasteBtn: {
+    padding: 10,
+  },
+  downloadBtn: {
+    flexDirection: 'row',
+    width: '100%',
+    paddingVertical: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  downloadBtnText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  }
 });
