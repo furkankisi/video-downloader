@@ -1,31 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   StyleSheet, Text, View, TextInput, TouchableOpacity, 
-  Animated, Easing, KeyboardAvoidingView, Platform, Alert
+  Animated, Easing, KeyboardAvoidingView, Platform, Alert, ActivityIndicator
 } from 'react-native';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+
+// KENDİ BACKEND ADRESİN (Lokalde deniyorsan http://127.0.0.1:8000 yap)
+const API_BASE = "https://video-downloader-cvtw.onrender.com"; 
 
 export default function App() {
   const [url, setUrl] = useState('');
-  const [activePlatform, setActivePlatform] = useState('instagram'); // instagram, youtube, tiktok
+  const [activePlatform, setActivePlatform] = useState('instagram'); 
+  const [isDownloading, setIsDownloading] = useState(false); // Yükleniyor animasyonu için
   
-  // Arka plan animasyonu için değer
   const scrollX = useRef(new Animated.Value(0)).current;
 
-  // Arka plandaki logoların sonsuz akması için animasyon döngüsü
   useEffect(() => {
     Animated.loop(
       Animated.timing(scrollX, {
-        toValue: -1000, // Ne kadar uzağa kayacağı
-        duration: 25000, // Kayma hızı (25 saniye)
+        toValue: -1000, 
+        duration: 25000, 
         easing: Easing.linear,
         useNativeDriver: true,
       })
     ).start();
   }, []);
 
-  // Panodan link yapıştırma fonksiyonu
   const handlePaste = async () => {
     const text = await Clipboard.getStringAsync();
     if (text) {
@@ -35,17 +38,79 @@ export default function App() {
     }
   };
 
-  const handleDownload = () => {
-    Alert.alert("Bilgi", `Arka plan (Backend) bağlandığında ${activePlatform.toUpperCase()} videosu inecek!`);
+  // GERÇEK İNDİRME FONKSİYONU
+  const handleDownload = async () => {
+    if (!url) {
+      Alert.alert("Uyarı", "Lütfen önce bir video linki yapıştırın.");
+      return;
+    }
+
+    setIsDownloading(true);
+
+    try {
+      // Şimdilik hepsi aynı backend'e gidiyor, modüler sisteme geçince ayıracağız
+      const endpoint = `${API_BASE}/download-video`;
+
+      if (Platform.OS === 'web') {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: url }),
+        });
+        
+        if (!response.ok) throw new Error("İndirme başarısız.");
+        
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `video_${Date.now()}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(blobUrl);
+      } else {
+        const dir = (FileSystem as any).documentDirectory || 'file:///var/mobile/';
+        const fileUri = `${dir}video_${Date.now()}.mp4`;
+
+        const downloadOptions: any = {
+          httpMethod: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: url }),
+        };
+
+        const downloadResumable = FileSystem.createDownloadResumable(
+          endpoint,
+          fileUri,
+          downloadOptions
+        );
+
+        const result = await downloadResumable.downloadAsync();
+        
+        if (result && result.status !== 200) {
+          await FileSystem.deleteAsync(result.uri, { idempotent: true });
+          throw new Error("Video indirilemedi. Gizli hesap veya hatalı link olabilir.");
+        }
+
+        if (result && result.uri) {
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(result.uri);
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert("Hata", error.message || "Video indirilirken bir sorun oluştu.");
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   return (
     <View style={styles.container}>
       
-      {/* 1. HAREKETLİ ARKA PLAN (Kayan Logolar) */}
       <View style={styles.backgroundWrapper}>
         <Animated.View style={[styles.movingBackground, { transform: [{ translateX: scrollX }] }]}>
-          {/* Döngüsel hissiyat için logoları çoğalttık */}
           {[...Array(6)].map((_, i) => (
             <View key={i} style={styles.logoRow}>
               <FontAwesome5 name="instagram" size={80} color="rgba(255,255,255,0.03)" style={styles.bgIcon} />
@@ -58,10 +123,8 @@ export default function App() {
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.content}>
         
-        {/* BAŞLIK */}
         <Text style={styles.title}>VideoSaver <Text style={styles.proBadge}>PRO</Text></Text>
 
-        {/* 2. PLATFORM SEÇİCİ (Üst Kısım) */}
         <View style={styles.platformSelector}>
           <TouchableOpacity 
             style={[styles.platformBtn, activePlatform === 'instagram' && styles.activeInstagram]}
@@ -85,32 +148,39 @@ export default function App() {
           </TouchableOpacity>
         </View>
 
-        {/* 3. INPUT VE YAPIŞTIRMA İKONU */}
         <View style={styles.inputWrapper}>
           <TextInput
             style={styles.input}
-            placeholder={`${activePlatform.toUpperCase()} linkini buraya girin...`}
+            placeholder={`${activePlatform.toUpperCase()} linkini yapıştırın...`}
             placeholderTextColor="#64748B"
             value={url}
             onChangeText={setUrl}
+            editable={!isDownloading}
           />
-          <TouchableOpacity style={styles.pasteBtn} onPress={handlePaste}>
+          <TouchableOpacity style={styles.pasteBtn} onPress={handlePaste} disabled={isDownloading}>
             <Ionicons name="clipboard-outline" size={24} color="#94A3B8" />
           </TouchableOpacity>
         </View>
 
-        {/* ANA İNDİR BUTONU */}
         <TouchableOpacity 
           style={[
             styles.downloadBtn, 
             activePlatform === 'instagram' && { backgroundColor: '#E1306C' },
             activePlatform === 'youtube' && { backgroundColor: '#FF0000' },
             activePlatform === 'tiktok' && { backgroundColor: '#00F2FE' },
+            isDownloading && { opacity: 0.7 } // İnerken buton rengi hafif solar
           ]} 
           onPress={handleDownload}
+          disabled={isDownloading}
         >
-          <Ionicons name="cloud-download-outline" size={24} color="white" style={{ marginRight: 8 }} />
-          <Text style={styles.downloadBtnText}>Videoyu Bul ve İndir</Text>
+          {isDownloading ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <>
+              <Ionicons name="cloud-download-outline" size={24} color="white" style={{ marginRight: 8 }} />
+              <Text style={styles.downloadBtnText}>Videoyu Bul ve İndir</Text>
+            </>
+          )}
         </TouchableOpacity>
 
       </KeyboardAvoidingView>
@@ -121,10 +191,10 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B0F19', // Çok premium koyu lacivert/siyah
+    backgroundColor: '#0B0F19', 
     justifyContent: 'center',
   },
- backgroundWrapper: {
+  backgroundWrapper: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -147,7 +217,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 24,
     alignItems: 'center',
-    zIndex: 1, // Animasyonun üstünde durması için
+    zIndex: 1, 
   },
   title: {
     fontSize: 36,
