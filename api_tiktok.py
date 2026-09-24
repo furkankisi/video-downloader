@@ -17,7 +17,7 @@ async def info_tiktok(request: VideoRequest):
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+            'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
@@ -38,11 +38,11 @@ async def download_tiktok(request: VideoRequest):
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
-        'format': 'bestvideo[ext=mp4]+bestaudio[m4a]/best[ext=mp4]/best',
+        'format': 'best/bestvideo+bestaudio',
         'merge_output_format': 'mp4',
         'ffmpeg_location': ffmpeg_path,
         'outtmpl': final_filepath,
-        'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+        'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
