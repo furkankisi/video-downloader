@@ -26,13 +26,16 @@ async def info_instagram(request: VideoRequest):
 async def download_instagram(request: VideoRequest):
     file_id = str(uuid.uuid4())
     os.makedirs("downloads", exist_ok=True)
+    
+    # yt-dlp ses ve videoyu birleştirebilmesi için outtmpl uzantısız olmalıdır
+    outtmpl_path = f"downloads/{file_id}"
     final_filepath = f"downloads/{file_id}.mp4"
     
     ydl_opts = {
         'quiet': True,
-        'format': 'best[ext=mp4]/best', 
-        'format_sort': ['vcodec:h264', 'vcodec:avc1', 'acodec:aac'],
-        'outtmpl': final_filepath,
+        'format': 'bestvideo+bestaudio/best', 
+        'merge_output_format': 'mp4',
+        'outtmpl': outtmpl_path,
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
     }
     try:
