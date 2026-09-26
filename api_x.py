@@ -1,63 +1,70 @@
-import os
-import yt_dlp
+import httpx
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from starlette.background import BackgroundTask
-from common import base_ydl_opts, extract_url, new_output_path, remove_files_with_stem
+from common import extract_url
 
 router = APIRouter()
 
 class XRequest(BaseModel):
     url: str
 
-def clean_x_url(raw_url: str) -> str:
-    url = extract_url(raw_url)
-    # X/Twitter linklerindeki ?s=20 gibi gereksiz parametreleri temizle
-    if "?" in url:
-        url = url.split("?")[0]
-    return url
-
 @router.post("/info-x")
 def info_x(request: XRequest):
-    url = clean_x_url(request.url)
-    opts = base_ydl_opts("twitter")
-    opts["skip_download"] = True
+    url = extract_url(request.url)
+    # X için hızlı oEmbed veya fallback başlık/kapak
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(url, download=False)
+        r = httpx.get("https://publish.twitter.com/oembed", params={"url": url}, timeout=10)
+        if r.status_code == 200:
+            d = r.json()
             return {
-                "title": info.get("title") or info.get("description") or "X Videosu",
-                "thumbnail": info.get("thumbnail", "")
+                "title": d.get("author_name", "X Gönderisi") + " - Video",
+                "thumbnail": ""
             }
-    except Exception as e:
-        print("X Info Hatası:", e)
-        return {"title": "X Videosu", "thumbnail": ""}
+    except:
+        pass
+    return {"title": "X Videosu", "thumbnail": ""}
 
 @router.post("/download-x")
 async def download_x(request: XRequest):
-    url = clean_x_url(request.url)
-    out = new_output_path("mp4")
-    final_filepath = str(out.with_suffix(".mp4"))
+    url = extract_url(request.url)
+    if not url:
+        raise HTTPException(status_code=400, detail="Geçersiz URL.")
 
-    opts = base_ydl_opts("twitter")
-    opts["outtmpl"] = str(out.with_suffix(""))
-    opts["format"] = "best[ext=mp4]/best"
+    # X videolarını saniyeler içinde yakalayan güvenli açık kaynak public altyapı
+    cobalt_api = "https://api.cobalt.tools/api/json"
+    
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0"
+    }
+    
+    payload = {
+        "url": url,
+        "vQuality": "720",
+        "filenamePattern": "basic"
+    }
 
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.download([url])
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            res = await client.post(cobalt_api, json=payload, headers=headers)
+            if res.status_code != 200:
+                raise Exception(f"API Hatası: {res.status_code}")
+                
+            data = res.json()
+            download_link = data.get("url")
+            if not download_link and "picker" in data:
+                download_link = data["picker"][0].get("url")
 
-        if not os.path.exists(final_filepath) or os.path.getsize(final_filepath) < 10000:
-            raise Exception("İndirilen dosya boyutu çok küçük veya bulunamadı.")
+            if not download_link:
+                raise Exception("İndirme linki alınamadı.")
 
-        return FileResponse(
-            final_filepath, 
-            media_type="video/mp4", 
-            filename="x_video.mp4",
-            background=BackgroundTask(remove_files_with_stem, out)
-        )
+            return JSONResponse({
+                "direct_url": download_link,
+                "title": "x_video.mp4"
+            })
+
     except Exception as e:
         print("X İndirme Hatası:", e)
-        remove_files_with_stem(out)
         raise HTTPException(status_code=400, detail="X videosu indirilemedi.")
