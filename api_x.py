@@ -11,9 +11,16 @@ router = APIRouter()
 class XRequest(BaseModel):
     url: str
 
+def clean_x_url(raw_url: str) -> str:
+    url = extract_url(raw_url)
+    # X/Twitter linklerindeki ?s=20 gibi gereksiz parametreleri temizle
+    if "?" in url:
+        url = url.split("?")[0]
+    return url
+
 @router.post("/info-x")
 def info_x(request: XRequest):
-    url = extract_url(request.url)
+    url = clean_x_url(request.url)
     opts = base_ydl_opts("twitter")
     opts["skip_download"] = True
     try:
@@ -29,7 +36,7 @@ def info_x(request: XRequest):
 
 @router.post("/download-x")
 async def download_x(request: XRequest):
-    url = extract_url(request.url)
+    url = clean_x_url(request.url)
     out = new_output_path("mp4")
     final_filepath = str(out.with_suffix(".mp4"))
 

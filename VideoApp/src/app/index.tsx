@@ -155,7 +155,6 @@ export default function App() {
         throw new Error(errorData.detail || "İndirme başarısız oldu.");
       }
 
-      // Web (Bilgisayar) için indirme
       if (Platform.OS === 'web') {
         const blob = await res.blob();
         const downloadUrl = window.URL.createObjectURL(blob);
@@ -170,15 +169,9 @@ export default function App() {
         return;
       }
 
-      // Mobil (iOS / Android) için indirme
       const dir = FileSystem.documentDirectory || 'file:///var/mobile/';
       const fileUri = `${dir}${activePlatform}_video_${Date.now()}.mp4`;
 
-      const downloadResumable = FileSystem.createDownloadResumable(res.url, fileUri, {}, (data) => {
-        // İstersen indirme yüzdesini burada takip edebilirsin
-      });
-
-      // Not: Fetch Response URL yerine backend akışını kaydetmek için doğrudan URL stream'i kullanıyoruz:
       const downloadResult = await FileSystem.downloadAsync(res.url, fileUri);
 
       if (downloadResult && downloadResult.uri) {
@@ -217,7 +210,7 @@ export default function App() {
               style={[styles.platformBtn, activePlatform === 'x' && styles.activeX]}
               onPress={() => handleTabPress('x')}
             >
-              <FontAwesome5 name="twitter" size={26} color={activePlatform === 'x' ? '#FFF' : '#64748B'} />
+              <Text style={[styles.xLogoText, { color: activePlatform === 'x' ? '#FFF' : '#64748B' }]}>𝕏</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -269,7 +262,11 @@ export default function App() {
                 <Image source={{ uri: videoInfo.thumbnail }} style={styles.thumbnail} resizeMode="cover" />
               ) : (
                 <View style={styles.fallbackThumbnail}>
-                  <FontAwesome5 name={activePlatform === 'x' ? 'twitter' : activePlatform} size={40} color="#00F2FE" />
+                  {activePlatform === 'x' ? (
+                    <Text style={[styles.xLogoText, { color: '#00F2FE', fontSize: 36 }]}>𝕏</Text>
+                  ) : (
+                    <FontAwesome5 name={activePlatform} size={40} color="#00F2FE" />
+                  )}
                   <Text style={styles.fallbackText}>{activePlatform === 'x' ? 'X' : activePlatform.toUpperCase()} Videosu</Text>
                 </View>
               )}
@@ -315,7 +312,7 @@ export default function App() {
           {[...Array(8)].map((_, i) => (
             <View key={i} style={styles.logoRow}>
               <FontAwesome5 name="instagram" size={45} color="#FFFFFF" style={styles.neonInsta} />
-              <FontAwesome5 name="twitter" size={45} color="#FFFFFF" style={styles.neonX} />
+              <Text style={[styles.neonXText, styles.neonX]}>𝕏</Text>
               <FontAwesome5 name="tiktok" size={45} color="#FFFFFF" style={styles.neonTiktok} />
             </View>
           ))}
@@ -332,7 +329,8 @@ const styles = StyleSheet.create({
   logoRow: { flexDirection: 'row', alignItems: 'center' },
   
   neonInsta: { marginHorizontal: 35, textShadowColor: '#E1306C', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
-  neonX: { marginHorizontal: 35, textShadowColor: '#FFFFFF', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
+  neonXText: { fontSize: 42, fontWeight: '900', marginHorizontal: 35, color: '#FFFFFF' },
+  neonX: { textShadowColor: '#FFFFFF', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
   neonTiktok: { marginHorizontal: 35, textShadowColor: '#FF0050', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
 
   content: { flex: 1, zIndex: 1, marginBottom: 70 }, 
@@ -340,7 +338,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 36, fontWeight: '900', color: '#FFFFFF', letterSpacing: 1.5, marginBottom: 30, textAlign: 'center', textShadowColor: '#00F2FE', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 },
   proBadge: { fontSize: 16, color: '#00F2FE', fontWeight: 'bold' },
   platformSelector: { flexDirection: 'row', backgroundColor: '#0F101A', borderRadius: 20, padding: 8, marginBottom: 25, width: '100%', justifyContent: 'space-between', borderWidth: 1, borderColor: '#1E2238' },
-  platformBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14 },
+  platformBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 14 },
+  xLogoText: { fontSize: 26, fontWeight: '900' },
   
   activeInstagram: { backgroundColor: '#E1306C', borderWidth: 1.5, borderColor: '#FF70A6', shadowColor: '#E1306C', elevation: 12, shadowOpacity: 0.8, shadowRadius: 10 },
   activeX: { backgroundColor: '#14171A', borderWidth: 1.5, borderColor: '#657786', shadowColor: '#FFFFFF', elevation: 12, shadowOpacity: 0.8, shadowRadius: 10 },
