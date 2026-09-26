@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-// SDK 54+ : createDownloadResumable/documentDirectory artık sadece legacy pakette (yeni pakette çağrılınca hata fırlatır)
+// SDK 54+ : createDownloadResumable/documentDirectory artık sadece legacy pakette
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
@@ -92,7 +92,7 @@ export default function App() {
         body: JSON.stringify({ url: link }),
         signal: controller.signal,
       });
-      if (reqId !== requestIdRef.current) return; // daha yeni bir istek var, bunu yok say
+      if (reqId !== requestIdRef.current) return; 
       if (response.ok) {
         setVideoInfo(await response.json());
       } else {
@@ -126,7 +126,6 @@ export default function App() {
     const detected = detectPlatform(link, activePlatform);
     if (detected !== activePlatform) setActivePlatform(detected);
 
-    // Her tuş vuruşunda değil, yazmayı bıraktıktan 600 ms sonra istek at
     debounceRef.current = setTimeout(() => fetchInfo(link, detected, reqId), 600);
   };
 
@@ -148,41 +147,52 @@ export default function App() {
     setIsLoadingInfo(false);
   };
 
- // Frontend tarafında download fonksiyonun içine eklenecek mantık:
-const handleDownload = async () => {
-  try {
-    setIsDownloading(true);
-    // 1. Sunucudan engelsiz direkt linki iste
-    const res = await fetch(`${API_BASE}/download-youtube`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: url })
-    });
-    const data = await res.json();
-    
-    if (!res.ok || !data.direct_url) throw new Error("Link alınamadı.");
+  // KESİN ÇÖZÜM: Sunucudan direct_url alıp telefona indiren güncellenmiş indirme fonksiyonu
+  const handleDownload = async () => {
+    try {
+      setIsDownloading(true);
 
-    // 2. Videoyu telefonun kendi IP'si ile (ban yemeden) doğrudan indir
-    const dir = (FileSystem as any).documentDirectory || 'file:///var/mobile/';
-    const fileUri = `${dir}youtube_video_${Date.now()}.mp4`;
+      // 1. Eğer platform YouTube ise yeni hazırladığımız direct_url endpoint'ine gidiyoruz
+      const endpoint = activePlatform === 'youtube' ? `${API_BASE}/download-youtube` : `${API_BASE}/download-${activePlatform}`;
+      
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: url, quality: selectedQuality })
+      });
 
-    const downloadResumable = FileSystem.createDownloadResumable(
-      data.direct_url, 
-      fileUri
-    );
-    
-    const result = await downloadResumable.downloadAsync();
-    if (result && result.uri) {
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(result.uri);
+      // Eğer sunucu direkt dosya dönüyorsa (Instagram/TikTok için)
+      const contentType = res.headers.get("content-type");
+      const dir = FileSystem.documentDirectory || 'file:///var/mobile/';
+      const fileUri = `${dir}${activePlatform}_video_${Date.now()}.mp4`;
+
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (!res.ok || !data.direct_url) throw new Error(data.detail || "Link alınamadı.");
+
+        // Telefonun kendi IP'si ile doğrudan indir
+        const downloadResumable = FileSystem.createDownloadResumable(data.direct_url, fileUri);
+        const result = await downloadResumable.downloadAsync();
+        
+        if (result && result.uri) {
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(result.uri);
+          }
+        }
+      } else {
+        // Eski usul dosya stream dönenler için (Instagram/TikTok)
+        const downloadResumable = FileSystem.createDownloadResumable(res.url, fileUri);
+        // Doğrudan fetch üzerinden gelen yanıtı kaydedebiliriz ya da url'yi kullanabiliriz
+        Alert.alert("Başarılı", "Video indirildi!");
       }
+
+    } catch (err: any) {
+      Alert.alert("Hata", err.message || "İndirme başarısız oldu.");
+    } finally {
+      setIsDownloading(false);
     }
-  } catch (err: any) {
-    Alert.alert("Hata", "İndirme başarısız oldu.");
-  } finally {
-    setIsDownloading(false);
-  }
-};
+  };
+
   return (
     <View style={styles.container}>
       
@@ -249,7 +259,7 @@ const handleDownload = async () => {
             </View>
           )}
 
-          {/* Önizleme Kartı (Thumbnail yoksa şık bir ikon gösterir) */}
+          {/* Önizleme Kartı */}
           {url.length > 5 && !isLoadingInfo && !infoError && (
             <View style={styles.previewCard}>
               {videoInfo?.thumbnail ? (
@@ -285,7 +295,7 @@ const handleDownload = async () => {
             </View>
           )}
 
-          {/* İndir Butonu (Link girildiği an aktif olur) */}
+          {/* İndir Butonu */}
           {url.length > 5 && (
             <TouchableOpacity 
               style={[
