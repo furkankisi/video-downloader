@@ -1,82 +1,96 @@
+import os
 import httpx
-import yt_dlp
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
-from common import (
-    MIN_FILE_SIZE, base_ydl_opts, cleanup_cookiefile, extract_url, find_output,
-    friendly_error, new_output_path, remove_files_with_stem, set_youtube_clients,
-)
+# Senin ortak fonksiyonların
+from common import extract_url, new_output_path, remove_files_with_stem
 
 router = APIRouter()
-
-# 3 kez deneyip seni bekletmemesi için SADECE en güçlü ve tek zinciri bırakıyoruz.
-CLIENT_CHAINS = [
-    ["ios", "android", "web"]
-]
 
 class VideoRequest(BaseModel):
     url: str
     quality: str = "best"
 
-def build_format(quality: str) -> str:
-    # RAM şişiren FFmpeg birleştirmesine girmeden tek parça MP4 çeker.
-    cap = {"720p": 720, "360p": 360}.get(quality, 1080)
-    h = f"[height<={cap}]"
-    return f"best[ext=mp4]{h}/best{h}/best"
-
 def _oembed(url: str) -> dict:
-    r = httpx.get("https://www.youtube.com/oembed", params={"url": url, "format": "json"}, timeout=10)
-    r.raise_for_status()
-    d = r.json()
-    return {"title": d.get("title", "YouTube Videosu"), "thumbnail": d.get("thumbnail_url", "")}
+    """Sadece başlık ve kapağı çekmek için YouTube'un resmi hafif API'si (Banlanmaz)"""
+    try:
+        r = httpx.get("https://www.youtube.com/oembed", params={"url": url, "format": "json"}, timeout=10)
+        if r.status_code == 200:
+            d = r.json()
+            return {"title": d.get("title", "YouTube Videosu"), "thumbnail": d.get("thumbnail_url", "")}
+    except:
+        pass
+    return {"title": "YouTube Videosu", "thumbnail": ""}
 
 @router.post("/info-youtube")
 def info_youtube(request: VideoRequest):
     url = extract_url(request.url)
-    try:
-        return _oembed(url)
-    except Exception as e:
-        print("YouTube oEmbed başarısız:", e)
-        return {"title": "YouTube Videosu", "thumbnail": ""}
+    return _oembed(url)
 
 @router.post("/download-youtube")
-def download_youtube(request: VideoRequest):
+async def download_youtube(request: VideoRequest):
     url = extract_url(request.url)
+    
+    # Senin common.py içindeki dosya yolu üreticin
     out = new_output_path("mp4")
-    fmt = build_format(request.quality)
-    last = None
+    final_filepath = str(out.with_suffix(".mp4"))
+    
+    # Cobalt API Ayarları (Ücretsiz, limitsiz ve ban korumalı)
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+    
+    # Kalite çevirisi
+    q_map = {"720p": "720", "360p": "360", "best": "1080"}
+    v_quality = q_map.get(request.quality, "720")
 
-    for clients in CLIENT_CHAINS:
-        opts = base_ydl_opts("youtube")
-        opts["format"] = fmt
-        opts["outtmpl"] = str(out.with_suffix("")) + ".%(ext)s"
-        
-        # BULUT SUNUCULARDA (RENDER) YOUTUBE'U AÇAN ALTIN AYAR:
-        # İstekleri IPv6 yerine zorla IPv4 üzerinden gönderir, bot duvarını aşar.
-        opts["source_address"] = "0.0.0.0" 
-
-        set_youtube_clients(opts, clients)
-        
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.download([url])
+    payload = {
+        "url": url,
+        "vQuality": v_quality,
+        "filenamePattern": "basic"
+    }
+    
+    try:
+        # httpx.AsyncClient ile asenkron API isteği (Sunucuyu kitlemez)
+        async with httpx.AsyncClient(timeout=60.0) as client:
             
-            final = find_output(out)
-            if not final or final.stat().st_size < MIN_FILE_SIZE:
-                raise RuntimeError("Bozuk veya boş dosya indirildi")
+            # 1. Aşama: Videoyu API'ye ver, hazır MP4 linkini kap
+            res = await client.post("https://api.cobalt.tools/api/json", json=payload, headers=headers)
+            res.raise_for_status()
+            data = res.json()
             
-            return FileResponse(
-                str(final), media_type="video/mp4", filename="yt_video.mp4",
-                background=BackgroundTask(remove_files_with_stem, out),
-            )
-        except Exception as e:
-            last = e
-            print(f"YouTube indirme hatası ({clients}):", e)
-            remove_files_with_stem(out)
-        finally:
-            cleanup_cookiefile(opts)
+            if data.get("status") == "error":
+                raise Exception(data.get("text", "API Hatası"))
+                
+            download_url = data.get("url")
+            if not download_url:
+                raise Exception("API indirme linki vermedi.")
+            
+            # 2. Aşama: Gelen linkten videoyu RAM'i şişirmeden (1MB parçalarla) sunucuya kaydet
+            async with client.stream("GET", download_url, follow_redirects=True) as video_res:
+                video_res.raise_for_status()
+                with open(final_filepath, "wb") as f:
+                    async for chunk in video_res.aiter_bytes(chunk_size=1024 * 1024):
+                        f.write(chunk)
 
-    raise HTTPException(status_code=400, detail=friendly_error(last, "YouTube"))
+        # 3. Aşama: İndirilen dosyayı kontrol et
+        if not os.path.exists(final_filepath) or os.path.getsize(final_filepath) < 50000:
+            raise Exception("İndirilen video bozuk veya ulaşılamadı.")
+
+        # Kullanıcıya gönder ve arka planda sunucudan temizle
+        return FileResponse(
+            final_filepath, 
+            media_type="video/mp4", 
+            filename="yt_video.mp4",
+            background=BackgroundTask(remove_files_with_stem, out)
+        )
+
+    except Exception as e:
+        print("API İndirme Hatası:", e)
+        remove_files_with_stem(out)
+        raise HTTPException(status_code=400, detail="YouTube videosu çekilemedi. Ücretsiz API reddetti.")
