@@ -148,78 +148,41 @@ export default function App() {
     setIsLoadingInfo(false);
   };
 
-  const handleDownload = async () => {
-    if (!url) {
-      Alert.alert("Uyarı", "Lütfen önce bir video linki yapıştırın.");
-      return;
-    }
-
+ // Frontend tarafında download fonksiyonun içine eklenecek mantık:
+const handleDownload = async () => {
+  try {
     setIsDownloading(true);
+    // 1. Sunucudan engelsiz direkt linki iste
+    const res = await fetch(`${API_BASE}/download-youtube`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: url })
+    });
+    const data = await res.json();
+    
+    if (!res.ok || !data.direct_url) throw new Error("Link alınamadı.");
 
-    try {
-      const link = extractUrl(url);
-      const platform = detectPlatform(link, activePlatform);
-      const endpoint = `${API_BASE}/download-${platform}`;
-      const payload: any = { url: link };
-      if (platform === 'youtube' && !isYoutubeShort) {
-        payload.quality = selectedQuality;
+    // 2. Videoyu telefonun kendi IP'si ile (ban yemeden) doğrudan indir
+    const dir = (FileSystem as any).documentDirectory || 'file:///var/mobile/';
+    const fileUri = `${dir}youtube_video_${Date.now()}.mp4`;
+
+    const downloadResumable = FileSystem.createDownloadResumable(
+      data.direct_url, 
+      fileUri
+    );
+    
+    const result = await downloadResumable.downloadAsync();
+    if (result && result.uri) {
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(result.uri);
       }
-
-      if (Platform.OS === 'web') {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!response.ok) throw new Error(await readError(response, "İndirme başarısız."));
-        
-        const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = `${platform}_video_${Date.now()}.mp4`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(blobUrl);
-      } else {
-        const dir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
-        const fileUri = `${dir}${platform}_video_${Date.now()}.mp4`;
-
-        const downloadOptions: any = {
-          httpMethod: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        };
-
-        const downloadResumable = FileSystem.createDownloadResumable(endpoint, fileUri, downloadOptions);
-        const result = await downloadResumable.downloadAsync();
-        
-        if (!result) throw new Error("İndirme iptal edildi.");
-
-        if (result.status !== 200) {
-          // Sunucu hata durumunda JSON döner; dosyanın içinden gerçek sebebi oku
-          let msg = "Video indirilemedi veya sunucu engelledi.";
-          try {
-            const body = await FileSystem.readAsStringAsync(result.uri);
-            const j = JSON.parse(body);
-            if (typeof j?.detail === 'string') msg = j.detail;
-          } catch {}
-          await FileSystem.deleteAsync(result.uri, { idempotent: true });
-          throw new Error(msg);
-        }
-
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(result.uri, { mimeType: 'video/mp4', UTI: 'public.mpeg-4' });
-        }
-      }
-    } catch (error: any) {
-      Alert.alert("Hata", error.message || "Video indirilirken bir sorun oluştu.");
-    } finally {
-      setIsDownloading(false);
     }
-  };
-
+  } catch (err: any) {
+    Alert.alert("Hata", "İndirme başarısız oldu.");
+  } finally {
+    setIsDownloading(false);
+  }
+};
   return (
     <View style={styles.container}>
       
