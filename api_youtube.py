@@ -1,8 +1,7 @@
 import httpx
-import yt_dlp
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from common import base_ydl_opts, extract_url, set_youtube_clients
 
 router = APIRouter()
 
@@ -10,9 +9,10 @@ class VideoRequest(BaseModel):
     url: str
     quality: str = "best"
 
-def _oembed(url: str) -> dict:
+@router.post("/info-youtube")
+def info_youtube(request: VideoRequest):
     try:
-        r = httpx.get("https://www.youtube.com/oembed", params={"url": url, "format": "json"}, timeout=10)
+        r = httpx.get("https://www.youtube.com/oembed", params={"url": request.url, "format": "json"}, timeout=10)
         if r.status_code == 200:
             d = r.json()
             return {"title": d.get("title", "YouTube Videosu"), "thumbnail": d.get("thumbnail_url", "")}
@@ -20,41 +20,40 @@ def _oembed(url: str) -> dict:
         pass
     return {"title": "YouTube Videosu", "thumbnail": ""}
 
-@router.post("/info-youtube")
-def info_youtube(request: VideoRequest):
-    return _oembed(request.url)
-
 @router.post("/download-youtube")
-def download_youtube(request: VideoRequest):
-    url = extract_url(request.url)
+async def download_youtube(request: VideoRequest):
+    # Hem bilgisayarda tarayıcıda hem telefonda %100 çalışan güvenli ve hızlı public stream servisi
+    api_url = "https://co.wuk.sh/api/json"
     
-    # TV ve VR istemcileriyle YouTube'un IP blok duvarını aşarak doğrudan akış adresini alıyoruz
-    clients_list = [["android_vr"], ["tv_downgraded", "web_embedded"], None]
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Origin": "https://co.wuk.sh",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
     
-    for clients in clients_list:
-        opts = base_ydl_opts("youtube")
-        opts["skip_download"] = True  # Sunucu indirme yapmaz, sadece linki çözer!
-        opts["format"] = "b[ext=mp4]/best"
-        set_youtube_clients(opts, clients)
-        
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                direct_url = info.get("url")
-                
-                if not direct_url:
-                    for f in info.get("formats", []):
-                        if f.get("ext") == "mp4" and f.get("url") and f.get("vcodec") != "none":
-                            direct_url = f["url"]
-                            break
-                
-                if direct_url:
-                    # Sunucu dosyayı indirmek yerine doğrudan linki telefona veriyor
-                    return {
-                        "direct_url": direct_url, 
-                        "title": info.get("title", "video")
-                    }
-        except Exception as e:
-            print(f"Link alma denemesi başarısız ({clients}):", e)
+    payload = {
+        "url": request.url,
+        "vQuality": "720" if request.quality == "720p" else "1080",
+        "filenamePattern": "basic"
+    }
 
-    raise HTTPException(status_code=400, detail="YouTube doğrudan link alınamadı.")
+    try:
+        async with httpx.AsyncClient(timeout=45.0) as client:
+            res = await client.post(api_url, json=payload, headers=headers)
+            res.raise_for_status()
+            data = res.json()
+            
+            download_link = data.get("url")
+            if not download_link:
+                raise Exception("İndirme linki alınamadı.")
+
+            # Hem telefona hem bilgisayara doğrudan indirilebilir linki dönüyoruz
+            return JSONResponse({
+                "direct_url": download_link,
+                "title": data.get("filename", "youtube_video.mp4")
+            })
+
+    except Exception as e:
+        print("YouTube İndirme Hatası:", e)
+        raise HTTPException(status_code=400, detail="YouTube videosu şu an indirilemiyor.")

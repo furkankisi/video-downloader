@@ -147,12 +147,10 @@ export default function App() {
     setIsLoadingInfo(false);
   };
 
-  // KESİN ÇÖZÜM: Sunucudan direct_url alıp telefona indiren güncellenmiş indirme fonksiyonu
-  const handleDownload = async () => {
+const handleDownload = async () => {
     try {
       setIsDownloading(true);
 
-      // 1. Eğer platform YouTube ise yeni hazırladığımız direct_url endpoint'ine gidiyoruz
       const endpoint = activePlatform === 'youtube' ? `${API_BASE}/download-youtube` : `${API_BASE}/download-${activePlatform}`;
       
       const res = await fetch(endpoint, {
@@ -161,33 +159,40 @@ export default function App() {
         body: JSON.stringify({ url: url, quality: selectedQuality })
       });
 
-      // Eğer sunucu direkt dosya dönüyorsa (Instagram/TikTok için)
-      const contentType = res.headers.get("content-type");
+      const data = await res.json();
+      if (!res.ok || !data.direct_url) throw new Error(data.detail || "Link alınamadı.");
+
+      // BİLGİSAYAR (WEB) İÇİN ÇÖZÜM: Doğrudan tarayıcıdan indir
+      if (Platform.OS === 'web') {
+        const a = document.createElement('a');
+        a.href = data.direct_url;
+        a.download = `${activePlatform}_video.mp4`;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setIsDownloading(false);
+        return;
+      }
+
+      // TELEFON (IOS / ANDROID) İÇİN ÇÖZÜM: FileSystem ile indir ve paylaş
       const dir = FileSystem.documentDirectory || 'file:///var/mobile/';
       const fileUri = `${dir}${activePlatform}_video_${Date.now()}.mp4`;
 
-      if (contentType && contentType.includes("application/json")) {
-        const data = await res.json();
-        if (!res.ok || !data.direct_url) throw new Error(data.detail || "Link alınamadı.");
-
-        // Telefonun kendi IP'si ile doğrudan indir
-        const downloadResumable = FileSystem.createDownloadResumable(data.direct_url, fileUri);
-        const result = await downloadResumable.downloadAsync();
-        
-        if (result && result.uri) {
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(result.uri);
-          }
+      const downloadResumable = FileSystem.createDownloadResumable(data.direct_url, fileUri);
+      const result = await downloadResumable.downloadAsync();
+      
+      if (result && result.uri) {
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(result.uri);
+        } else {
+          Alert.alert("Başarılı", "Video başarıyla indirildi.");
         }
-      } else {
-        // Eski usul dosya stream dönenler için (Instagram/TikTok)
-        const downloadResumable = FileSystem.createDownloadResumable(res.url, fileUri);
-        // Doğrudan fetch üzerinden gelen yanıtı kaydedebiliriz ya da url'yi kullanabiliriz
-        Alert.alert("Başarılı", "Video indirildi!");
       }
 
-    } catch (err: any) {
-      Alert.alert("Hata", err.message || "İndirme başarısız oldu.");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "İndirme başarısız oldu.";
+      Alert.alert("Hata", errorMessage);
     } finally {
       setIsDownloading(false);
     }
