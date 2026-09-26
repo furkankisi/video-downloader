@@ -1,4 +1,3 @@
-import os
 import yt_dlp
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -15,22 +14,13 @@ router = APIRouter()
 class VideoRequest(BaseModel):
     url: str
 
-def get_cookie_opts():
-    # Proje klasöründeki cookies.txt dosyasını yt-dlp'ye tanıtıyoruz
-    cookie_path = "cookies.txt"
-    if os.path.exists(cookie_path):
-        return {"cookiefile": cookie_path}
-    return {}
-
 @router.post("/info-instagram")
 def info_instagram(request: VideoRequest):
     url = extract_url(request.url)
     errors = []
-    cookie_opt = get_cookie_opts()
-    
     for opts in ydl_attempts():
         try:
-            with yt_dlp.YoutubeDL({**opts, **cookie_opt, "skip_download": True}) as ydl:
+            with yt_dlp.YoutubeDL({**opts, "skip_download": True}) as ydl:
                 info = ydl.extract_info(url, download=False)
                 return {"title": info.get("title") or "Instagram Videosu", "thumbnail": info.get("thumbnail") or ""}
         except Exception as e:
@@ -42,14 +32,10 @@ def _download_core(link: str) -> FileResponse:
     url = extract_url(link)
     out = new_output_path("mp4")
     errors = []
-    cookie_opt = get_cookie_opts()
-    
     for opts in ydl_attempts():
         try:
             opts["format"] = VIDEO_FORMAT
             opts["outtmpl"] = str(out.with_suffix("")) + ".%(ext)s"
-            opts.update(cookie_opt)
-            
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
             final = find_output(out)
