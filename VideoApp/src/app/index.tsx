@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
 
   activeInstagram: { backgroundColor: '#E1306C', borderWidth: 1.5, borderColor: '#FF70A6', shadowColor: '#E1306C', elevation: 12, shadowOpacity: 0.8, shadowRadius: 10 },
   activeX: { backgroundColor: '#14171A', borderWidth: 1.5, borderColor: '#657786', shadowColor: '#FFFFFF', elevation: 12, shadowOpacity: 0.8, shadowRadius: 10 },
-  activeTiktok: { backgroundColor: '#FF0050', borderWidth: 1.5, borderColor: '#25F4EE', shadowColor: '#25F4EE', elevation: 12, shadowOpacity: 0.9, shadowRadius: 14 },
+  activeTiktok: { backgroundColor: '#0A0E17', borderWidth: 1.5, borderColor: '#25F4EE', shadowColor: '#25F4EE', elevation: 12, shadowOpacity: 0.9, shadowRadius: 14 },
 
   inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0F101A', borderRadius: 16, borderWidth: 1, borderColor: '#2A2F4C', marginBottom: 10, paddingHorizontal: 16, width: '100%', shadowColor: '#00F2FE', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5 },
   clearBtn: { marginRight: 10 },
@@ -478,6 +478,6 @@ const styles = StyleSheet.create({
   downloadBtn: { flexDirection: 'row', width: '100%', paddingVertical: 18, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8 },
   btnInstagram: { backgroundColor: '#E1306C', shadowColor: '#E1306C' },
   btnX: { backgroundColor: '#14171A', shadowColor: '#FFFFFF', borderWidth: 1, borderColor: '#657786' },
-  btnTiktok: { backgroundColor: '#FF0050', borderWidth: 1, borderColor: '#25F4EE', shadowColor: '#25F4EE' },
+  btnTiktok: { backgroundColor: '#0A0E17', borderWidth: 1, borderColor: '#25F4EE', shadowColor: '#25F4EE' },
   downloadBtnText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', letterSpacing: 0.5 }
 });
