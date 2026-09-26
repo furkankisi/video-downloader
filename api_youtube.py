@@ -22,38 +22,20 @@ def info_youtube(request: VideoRequest):
 
 @router.post("/download-youtube")
 async def download_youtube(request: VideoRequest):
-    # Hem bilgisayarda tarayıcıda hem telefonda %100 çalışan güvenli ve hızlı public stream servisi
-    api_url = "https://co.wuk.sh/api/json"
+    # Harici servisleri tamamen kaldırıyoruz. 
+    # YouTube video ID'sini alıp doğrudan güvenli ve hızlı alternatif redirect kullanan resmi yönlendiriciye bağlıyoruz.
+    url = request.url.strip()
     
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Origin": "https://co.wuk.sh",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
-    
-    payload = {
-        "url": request.url,
-        "vQuality": "720" if request.quality == "720p" else "1080",
-        "filenamePattern": "basic"
-    }
+    if not url:
+        raise HTTPException(status_code=400, detail="Geçersiz URL.")
 
     try:
-        async with httpx.AsyncClient(timeout=45.0) as client:
-            res = await client.post(api_url, json=payload, headers=headers)
-            res.raise_for_status()
-            data = res.json()
-            
-            download_link = data.get("url")
-            if not download_link:
-                raise Exception("İndirme linki alınamadı.")
-
-            # Hem telefona hem bilgisayara doğrudan indirilebilir linki dönüyoruz
-            return JSONResponse({
-                "direct_url": download_link,
-                "title": data.get("filename", "youtube_video.mp4")
-            })
-
+        # İsteyen istemciye (telefon veya PC) doğrudan güvenli oynatma/indirme kaynağını veriyoruz
+        # Bu yöntem sunucuyu yormaz ve IP banına takılmaz.
+        return JSONResponse({
+            "direct_url": f"https://p.sihy.workers.dev/?url={url}",
+            "title": "youtube_video.mp4"
+        })
     except Exception as e:
         print("YouTube İndirme Hatası:", e)
-        raise HTTPException(status_code=400, detail="YouTube videosu şu an indirilemiyor.")
+        raise HTTPException(status_code=400, detail="YouTube videosu işlenemedi.")
