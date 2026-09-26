@@ -2,6 +2,7 @@
 import os
 import re
 import shutil
+import subprocess
 import time
 import uuid
 from pathlib import Path
@@ -118,6 +119,63 @@ def base_ydl_opts() -> dict:
     if proxy:
         opts["proxy"] = proxy
     return opts
+
+
+# En sağlam sıralama: önce h264 (her cihaz/tarayıcı oynatır), olmazsa yine de bir şey indir.
+# ÖNEMLİ: sadece "b[ext=mp4]" gibi codec belirtmeyen bir seçici, iPhone'un DECODE EDEMEDİĞİ
+# vp9/av1 video + normal ses içeren bir mp4 seçebiliyordu. Sonuç: dosya "iniyor" ama iPhone'da
+# sadece ses çalıp görüntü hiç açılmıyordu (ses her zaman AAC/decode edilebilir, video değildi).
+VIDEO_FORMAT = (
+    "b[vcodec^=h264][ext=mp4]/b[vcodec^=avc][ext=mp4]/"
+    "bv*[vcodec^=h264][ext=mp4]+ba[ext=m4a]/bv*[vcodec^=avc1]+ba/"
+    "b[ext=mp4]/bv*+ba/b"
+)
+
+_H264_NAMES = ("h264", "avc")
+
+
+def _probe_video_codec(path: Path, ffmpeg: str) -> Optional[str]:
+    """ffprobe'a bağımlı kalmadan (bazı ortamlarda kurulu olmayabiliyor) ffmpeg'in kendi
+    çıktısından video codec adını okur."""
+    try:
+        proc = subprocess.run(
+            [ffmpeg, "-i", str(path)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=15,
+        )
+        text = proc.stderr.decode("utf-8", "ignore")
+        m = re.search(r"Video:\s*([a-zA-Z0-9_]+)", text)
+        return m.group(1).lower() if m else None
+    except Exception:
+        return None
+
+
+def ensure_h264(path: Path) -> Path:
+    """
+    Son güvenlik ağı: format seçimi yine de h264 olmayan bir video getirirse (örn. kaynakta
+    hiç h264 seçeneği yoksa), dosyayı iPhone/Android/tarayıcıların garanti oynattığı
+    h264 + aac'ye çevirir. Zaten h264 ise dokunmadan aynı dosyayı döndürür.
+    """
+    ff = ffmpeg_path()
+    if not ff:
+        return path
+    codec = _probe_video_codec(path, ff)
+    if codec is None or any(codec.startswith(n) for n in _H264_NAMES):
+        return path
+
+    out = path.with_name(path.stem + "_h264.mp4")
+    try:
+        subprocess.run(
+            [ff, "-y", "-i", str(path),
+             "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
+             "-c:a", "aac", "-b:a", "128k",
+             "-movflags", "+faststart", str(out)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=240, check=True,
+        )
+        path.unlink(missing_ok=True)
+        return out
+    except Exception as e:
+        print("H264 dönüştürme hatası (orijinal dosya kullanılıyor):", e)
+        return path
 
 
 def try_impersonate(opts: dict) -> dict:

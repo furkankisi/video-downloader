@@ -7,10 +7,12 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
+from fastapi import Query
+
 from common import (
-    DESKTOP_UA, MIN_FILE_SIZE, extract_url, final_error, find_output,
-    friendly_error, new_output_path, remove_files_with_stem, resolve_redirect,
-    ydl_attempts,
+    DESKTOP_UA, MIN_FILE_SIZE, VIDEO_FORMAT, ensure_h264, extract_url, final_error,
+    find_output, friendly_error, new_output_path, remove_files_with_stem,
+    resolve_redirect, ydl_attempts,
 )
 
 router = APIRouter()
@@ -123,9 +125,8 @@ def info_x(request: VideoRequest):
     raise HTTPException(status_code=400, detail=friendly_error(final_error(errors, "X"), "X"))
 
 
-@router.post("/download-x")
-def download_x(request: VideoRequest):
-    url = _resolve(extract_url(request.url))
+def _download_core(link: str) -> FileResponse:
+    url = _resolve(extract_url(link))
     status_id = _status_id(url)
     out = new_output_path("mp4")
     errors = []
@@ -133,12 +134,13 @@ def download_x(request: VideoRequest):
     # 1) yt-dlp
     for opts in ydl_attempts():
         try:
-            opts["format"] = "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b"
+            opts["format"] = VIDEO_FORMAT
             opts["outtmpl"] = str(out.with_suffix("")) + ".%(ext)s"
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
             final = find_output(out)
             if final and final.stat().st_size >= MIN_FILE_SIZE:
+                final = ensure_h264(final)
                 return FileResponse(str(final), media_type="video/mp4", filename="x_video.mp4",
                                     background=BackgroundTask(remove_files_with_stem, out))
             raise RuntimeError("Bozuk veya boş dosya indirildi")
@@ -177,7 +179,8 @@ def download_x(request: VideoRequest):
                         f.write(chunk)
             if out.stat().st_size < MIN_FILE_SIZE:
                 raise RuntimeError("Bozuk veya boş dosya indirildi")
-            return FileResponse(str(out), media_type="video/mp4", filename="x_video.mp4",
+            final = ensure_h264(out)
+            return FileResponse(str(final), media_type="video/mp4", filename="x_video.mp4",
                                 background=BackgroundTask(remove_files_with_stem, out))
         except Exception as e:
             errors.append(e)
@@ -185,3 +188,15 @@ def download_x(request: VideoRequest):
             remove_files_with_stem(out)
 
     raise HTTPException(status_code=400, detail=friendly_error(final_error(errors, "X"), "X"))
+
+
+@router.post("/download-x")
+def download_x(request: VideoRequest):
+    return _download_core(request.url)
+
+
+@router.get("/download-x")
+def download_x_get(url: str = Query(...)):
+    # Mobil uygulama FileSystem.downloadAsync ile POST body gönderemiyor, o yüzden bu GET
+    # adresini kullanıyor.
+    return _download_core(url)

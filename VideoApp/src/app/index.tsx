@@ -163,10 +163,13 @@ export default function App() {
     try {
       const link = extractUrl(url);
       const platform = detectPlatform(link, activePlatform);
-      const endpoint = `${API_BASE}/download-${platform}`;
+      const filename = `${platform}_video_${Date.now()}.mp4`;
 
       if (Platform.OS === 'web') {
-        const res = await fetch(endpoint, {
+        // Web: dosyayı POST ile alıp, mümkünse iOS/Android'in yerel paylaş sayfasını açıyoruz
+        // (navigator.share ile "Videoyu Kaydet" seçeneği gelir). Bu desteklenmiyorsa
+        // (örn. masaüstü tarayıcı) normal indirme bağlantısına düşüyoruz.
+        const res = await fetch(`${API_BASE}/download-${platform}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: link }),
@@ -175,10 +178,26 @@ export default function App() {
           throw new Error(await readError(res, "İndirme başarısız oldu."));
         }
         const blob = await res.blob();
+
+        const nav: any = typeof navigator !== 'undefined' ? navigator : null;
+        if (nav?.share && nav?.canShare) {
+          try {
+            const file = new File([blob], filename, { type: 'video/mp4' });
+            if (nav.canShare({ files: [file] })) {
+              await nav.share({ files: [file], title: filename });
+              setDownloadSuccess(true);
+              return;
+            }
+          } catch (shareErr) {
+            // Kullanıcı paylaşım sayfasını iptal etmiş olabilir; sessizce klasik indirmeye düş
+            console.log('navigator.share kullanılamadı, klasik indirmeye düşülüyor:', shareErr);
+          }
+        }
+
         const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = downloadUrl;
-        a.download = `${platform}_video_${Date.now()}.mp4`;
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -187,19 +206,13 @@ export default function App() {
         return;
       }
 
-      // Mobil: sunucuya POST ile indirip diske kaydet
+      // Mobil (Expo/React Native): FileSystem'in indirme fonksiyonu POST body göndermeyi
+      // desteklemiyor, bu yüzden linki GET adresine query parametresi olarak koyuyoruz.
+      const endpoint = `${API_BASE}/download-${platform}?url=${encodeURIComponent(link)}`;
       const dir = FileSystem.cacheDirectory || FileSystem.documentDirectory || 'file:///var/mobile/';
-      const fileUri = `${dir}${platform}_video_${Date.now()}.mp4`;
+      const fileUri = `${dir}${filename}`;
 
-      const downloadResumable = FileSystem.createDownloadResumable(
-        endpoint,
-        fileUri,
-        {
-          httpMethod: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: link }),
-        } as any,
-      );
+      const downloadResumable = FileSystem.createDownloadResumable(endpoint, fileUri);
       const result = await downloadResumable.downloadAsync();
 
       if (!result) throw new Error("İndirme iptal edildi.");
@@ -216,10 +229,11 @@ export default function App() {
         throw new Error(msg);
       }
 
+      // İndirme bitince otomatik olarak alttan paylaş/kaydet sayfasını aç
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(result.uri, { mimeType: 'video/mp4', UTI: 'public.mpeg-4' });
       } else {
-        Alert.alert("Başarılı", "Video indirildi.");
+        Alert.alert("Başarılı", "Video indirildi: " + result.uri);
       }
       setDownloadSuccess(true);
     } catch (err: unknown) {
@@ -414,7 +428,7 @@ const styles = StyleSheet.create({
 
   activeInstagram: { backgroundColor: '#E1306C', borderWidth: 1.5, borderColor: '#FF70A6', shadowColor: '#E1306C', elevation: 12, shadowOpacity: 0.8, shadowRadius: 10 },
   activeX: { backgroundColor: '#14171A', borderWidth: 1.5, borderColor: '#657786', shadowColor: '#FFFFFF', elevation: 12, shadowOpacity: 0.8, shadowRadius: 10 },
-  activeTiktok: { backgroundColor: '#FF0050', borderWidth: 1.5, borderColor: '#FF758C', shadowColor: '#FF0050', elevation: 12, shadowOpacity: 0.8, shadowRadius: 12 },
+  activeTiktok: { backgroundColor: '#0073ff', borderWidth: 1.5, borderColor: '#FF758C', shadowColor: '#FF0050', elevation: 12, shadowOpacity: 0.8, shadowRadius: 12 },
 
   inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0F101A', borderRadius: 16, borderWidth: 1, borderColor: '#2A2F4C', marginBottom: 10, paddingHorizontal: 16, width: '100%', shadowColor: '#00F2FE', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5 },
   clearBtn: { marginRight: 10 },

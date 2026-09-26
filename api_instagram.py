@@ -1,12 +1,12 @@
 import yt_dlp
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
 from common import (
-    MIN_FILE_SIZE, extract_url, final_error, find_output, friendly_error,
-    new_output_path, remove_files_with_stem, ydl_attempts,
+    MIN_FILE_SIZE, VIDEO_FORMAT, ensure_h264, extract_url, final_error, find_output,
+    friendly_error, new_output_path, remove_files_with_stem, ydl_attempts,
 )
 
 router = APIRouter()
@@ -36,19 +36,19 @@ def info_instagram(request: VideoRequest):
     raise HTTPException(status_code=400, detail=friendly_error(final_error(errors, "Instagram"), "Instagram"))
 
 
-@router.post("/download-instagram")
-def download_instagram(request: VideoRequest):
-    url = extract_url(request.url)
+def _download_core(link: str) -> FileResponse:
+    url = extract_url(link)
     out = new_output_path("mp4")
     errors = []
     for opts in ydl_attempts():
         try:
-            opts["format"] = "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b"
+            opts["format"] = VIDEO_FORMAT
             opts["outtmpl"] = str(out.with_suffix("")) + ".%(ext)s"
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
             final = find_output(out)
             if final and final.stat().st_size >= MIN_FILE_SIZE:
+                final = ensure_h264(final)
                 return FileResponse(str(final), media_type="video/mp4", filename="ig_video.mp4",
                                     background=BackgroundTask(remove_files_with_stem, out))
             raise RuntimeError("Bozuk veya boş dosya indirildi")
@@ -57,3 +57,15 @@ def download_instagram(request: VideoRequest):
             print("Instagram indirme hatası:", e)
             remove_files_with_stem(out)
     raise HTTPException(status_code=400, detail=friendly_error(final_error(errors, "Instagram"), "Instagram"))
+
+
+@router.post("/download-instagram")
+def download_instagram(request: VideoRequest):
+    return _download_core(request.url)
+
+
+@router.get("/download-instagram")
+def download_instagram_get(url: str = Query(...)):
+    # Mobil uygulama FileSystem.downloadAsync ile POST body gönderemiyor, o yüzden bu GET
+    # adresini kullanıyor.
+    return _download_core(url)

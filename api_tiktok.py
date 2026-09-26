@@ -5,16 +5,15 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
+from fastapi import Query
+
 from common import (
-    DESKTOP_UA, MIN_FILE_SIZE, extract_url, final_error, find_output,
-    friendly_error, new_output_path, remove_files_with_stem, resolve_redirect,
-    ydl_attempts,
+    DESKTOP_UA, MIN_FILE_SIZE, VIDEO_FORMAT, ensure_h264, extract_url, final_error,
+    find_output, friendly_error, new_output_path, remove_files_with_stem,
+    resolve_redirect, ydl_attempts,
 )
 
 router = APIRouter()
-
-# h264 tercih et (iOS/Android her yerde oynatır), yoksa ne varsa
-TT_FORMAT = "b[vcodec^=h264][ext=mp4]/b[vcodec^=avc][ext=mp4]/b[ext=mp4]/b"
 
 
 class VideoRequest(BaseModel):
@@ -74,20 +73,20 @@ def info_tiktok(request: VideoRequest):
     raise HTTPException(status_code=400, detail=friendly_error(final_error(errors, "TikTok"), "TikTok"))
 
 
-@router.post("/download-tiktok")
-def download_tiktok(request: VideoRequest):
-    url = _resolve(extract_url(request.url))
+def _download_core(link: str) -> FileResponse:
+    url = _resolve(extract_url(link))
     out = new_output_path("mp4")
     errors = []
 
     for opts in ydl_attempts():
         try:
-            opts["format"] = TT_FORMAT
+            opts["format"] = VIDEO_FORMAT
             opts["outtmpl"] = str(out.with_suffix("")) + ".%(ext)s"
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
             final = find_output(out)
             if final and final.stat().st_size >= MIN_FILE_SIZE:
+                final = ensure_h264(final)
                 return FileResponse(str(final), media_type="video/mp4", filename="tiktok_video.mp4",
                                     background=BackgroundTask(remove_files_with_stem, out))
             raise RuntimeError("Bozuk veya boş dosya indirildi")
@@ -111,7 +110,8 @@ def download_tiktok(request: VideoRequest):
                     f.write(chunk)
         if out.stat().st_size < MIN_FILE_SIZE:
             raise RuntimeError("Bozuk veya boş dosya indirildi")
-        return FileResponse(str(out), media_type="video/mp4", filename="tiktok_video.mp4",
+        final = ensure_h264(out)
+        return FileResponse(str(final), media_type="video/mp4", filename="tiktok_video.mp4",
                             background=BackgroundTask(remove_files_with_stem, out))
     except Exception as e:
         errors.append(e)
@@ -119,3 +119,15 @@ def download_tiktok(request: VideoRequest):
         remove_files_with_stem(out)
 
     raise HTTPException(status_code=400, detail=friendly_error(final_error(errors, "TikTok"), "TikTok"))
+
+
+@router.post("/download-tiktok")
+def download_tiktok(request: VideoRequest):
+    return _download_core(request.url)
+
+
+@router.get("/download-tiktok")
+def download_tiktok_get(url: str = Query(...)):
+    # Mobil uygulamanın FileSystem.downloadAsync ile POST body göndermesi mümkün değil
+    # (Expo bunu desteklemiyor), bu yüzden mobil doğrudan bu GET adresini kullanıyor.
+    return _download_core(url)
