@@ -8,7 +8,6 @@ import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
-// Sunucu adresi: Vercel/Expo ortam değişkeni EXPO_PUBLIC_API_BASE ile değiştirilebilir (kod değiştirmeden)
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || "https://video-downloader-cvtw.onrender.com").replace(/\/$/, "");
 const INFO_TIMEOUT_MS = 70000;
 
@@ -41,15 +40,13 @@ const readError = async (response: Response, fallback: string): Promise<string> 
   return fallback;
 };
 
-// TikTok'un gerçek logosu, siyah ikonun arkasında hafif kaymış camgöbeği (cyan) ve
-// pembe-kırmızı (magenta) katmanlardan oluşan bir "glitch" efektiyle oluşuyor.
-// Tek renkli bir ikon yerine bu üç katmanı üst üste koyunca orijinaline çok daha yakın duruyor.
+// TikTok Glitch İkonu: T'nin içi beyaz, arkadaki kareler tamamen temizlenmiş versiyonu
 function TikTokGlitchIcon({ size, active }: { size: number; active: boolean }) {
   if (!active) {
     return <FontAwesome5 name="tiktok" size={size} color="#64748B" />;
   }
   return (
-    <View style={{ width: size, height: size }}>
+    <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
       <FontAwesome5
         name="tiktok" size={size} color="#25F4EE"
         style={{ position: 'absolute', left: -1.5, top: 1 }}
@@ -58,7 +55,7 @@ function TikTokGlitchIcon({ size, active }: { size: number; active: boolean }) {
         name="tiktok" size={size} color="#FE2C55"
         style={{ position: 'absolute', left: 1.5, top: -1 }}
       />
-      <FontAwesome5 name="tiktok" size={size} color="#0A0A0A" style={{ position: 'absolute' }} />
+      <FontAwesome5 name="tiktok" size={size} color="#FFFFFF" style={{ position: 'absolute' }} />
     </View>
   );
 }
@@ -153,7 +150,6 @@ export default function App() {
     const detected = detectPlatform(link, activePlatform);
     if (detected !== activePlatform) setActivePlatform(detected);
 
-    // Her tuş vuruşunda değil, yazmayı bıraktıktan 600 ms sonra istek at
     debounceRef.current = setTimeout(() => fetchInfo(link, detected, reqId), 600);
   };
 
@@ -188,9 +184,6 @@ export default function App() {
       const filename = `${platform}_video_${Date.now()}.mp4`;
 
       if (Platform.OS === 'web') {
-        // Web: dosyayı POST ile alıp, mümkünse iOS/Android'in yerel paylaş sayfasını açıyoruz
-        // (navigator.share ile "Videoyu Kaydet" seçeneği gelir). Bu desteklenmiyorsa
-        // (örn. masaüstü tarayıcı) normal indirme bağlantısına düşüyoruz.
         const res = await fetch(`${API_BASE}/download-${platform}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -211,8 +204,7 @@ export default function App() {
               return;
             }
           } catch (shareErr) {
-            // Kullanıcı paylaşım sayfasını iptal etmiş olabilir; sessizce klasik indirmeye düş
-            console.log('navigator.share kullanılamadı, klasik indirmeye düşülüyor:', shareErr);
+            console.log('navigator.share kullanılamadı:', shareErr);
           }
         }
 
@@ -228,8 +220,6 @@ export default function App() {
         return;
       }
 
-      // Mobil (Expo/React Native): FileSystem'in indirme fonksiyonu POST body göndermeyi
-      // desteklemiyor, bu yüzden linki GET adresine query parametresi olarak koyuyoruz.
       const endpoint = `${API_BASE}/download-${platform}?url=${encodeURIComponent(link)}`;
       const dir = FileSystem.cacheDirectory || FileSystem.documentDirectory || 'file:///var/mobile/';
       const fileUri = `${dir}${filename}`;
@@ -240,7 +230,6 @@ export default function App() {
       if (!result) throw new Error("İndirme iptal edildi.");
 
       if (result.status !== 200) {
-        // Sunucu hata durumunda küçük bir JSON döner; gerçek sebebi dosyadan oku
         let msg = "Video indirilemedi.";
         try {
           const body = await FileSystem.readAsStringAsync(result.uri);
@@ -251,7 +240,6 @@ export default function App() {
         throw new Error(msg);
       }
 
-      // İndirme bitince otomatik olarak alttan paylaş/kaydet sayfasını aç
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(result.uri, { mimeType: 'video/mp4', UTI: 'public.mpeg-4' });
       } else {
@@ -260,7 +248,6 @@ export default function App() {
       setDownloadSuccess(true);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "İndirme başarısız oldu.";
-      // Alert.alert web'de sessizce hiçbir şey yapmaz; hatayı ekranda kartla göster
       setDownloadError(errorMessage);
       if (Platform.OS !== 'web') Alert.alert("İndirilemedi", errorMessage);
     } finally {
@@ -344,7 +331,7 @@ export default function App() {
             </View>
           )}
 
-          {/* Önizleme Kartı (Thumbnail yoksa şık bir ikon gösterir) */}
+          {/* Önizleme Kartı */}
           {url.length > 5 && !isLoadingInfo && !infoError && (
             <View style={styles.previewCard}>
               {videoInfo?.thumbnail ? (
@@ -414,7 +401,7 @@ export default function App() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Alt Animasyon Şeridi */}
+      {/* Alt Animasyon Şeridi (TikTok karesiz, içi beyaz glitch efektli) */}
       <View style={styles.bottomAnimationContainer} pointerEvents="none">
         <Animated.View style={[styles.movingBackground, { transform: [{ translateX: scrollX }] }]}>
           {[...Array(8)].map((_, i) => (
