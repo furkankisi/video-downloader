@@ -1,3 +1,4 @@
+import os
 import yt_dlp
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -11,23 +12,25 @@ from common import (
 
 router = APIRouter()
 
-
 class VideoRequest(BaseModel):
     url: str
 
-
-# ÖNEMLİ: bu iki endpoint önceden 'async def' idi ve içeride yt-dlp'nin senkron (bloklayan)
-# fonksiyonlarını çağırıyordu. Bu, bir Instagram isteği işlenirken sunucunun TikTok/X gibi
-# diğer tüm isteklere de aynı anda cevap veremediği anlamına geliyordu. 'def' (senkron) yapınca
-# FastAPI bunu otomatik olarak ayrı bir thread'de çalıştırıyor, sunucu kilitlenmiyor.
+def get_cookie_opts():
+    # Proje klasöründeki cookies.txt dosyasını yt-dlp'ye tanıtıyoruz
+    cookie_path = "cookies.txt"
+    if os.path.exists(cookie_path):
+        return {"cookiefile": cookie_path}
+    return {}
 
 @router.post("/info-instagram")
 def info_instagram(request: VideoRequest):
     url = extract_url(request.url)
     errors = []
+    cookie_opt = get_cookie_opts()
+    
     for opts in ydl_attempts():
         try:
-            with yt_dlp.YoutubeDL({**opts, "skip_download": True}) as ydl:
+            with yt_dlp.YoutubeDL({**opts, **cookie_opt, "skip_download": True}) as ydl:
                 info = ydl.extract_info(url, download=False)
                 return {"title": info.get("title") or "Instagram Videosu", "thumbnail": info.get("thumbnail") or ""}
         except Exception as e:
@@ -35,15 +38,18 @@ def info_instagram(request: VideoRequest):
             print("Instagram bilgi hatası:", e)
     raise HTTPException(status_code=400, detail=friendly_error(final_error(errors, "Instagram"), "Instagram"))
 
-
 def _download_core(link: str) -> FileResponse:
     url = extract_url(link)
     out = new_output_path("mp4")
     errors = []
+    cookie_opt = get_cookie_opts()
+    
     for opts in ydl_attempts():
         try:
             opts["format"] = VIDEO_FORMAT
             opts["outtmpl"] = str(out.with_suffix("")) + ".%(ext)s"
+            opts.update(cookie_opt)
+            
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
             final = find_output(out)
@@ -58,14 +64,10 @@ def _download_core(link: str) -> FileResponse:
             remove_files_with_stem(out)
     raise HTTPException(status_code=400, detail=friendly_error(final_error(errors, "Instagram"), "Instagram"))
 
-
 @router.post("/download-instagram")
 def download_instagram(request: VideoRequest):
     return _download_core(request.url)
 
-
 @router.get("/download-instagram")
 def download_instagram_get(url: str = Query(...)):
-    # Mobil uygulama FileSystem.downloadAsync ile POST body gönderemiyor, o yüzden bu GET
-    # adresini kullanıyor.
     return _download_core(url)
