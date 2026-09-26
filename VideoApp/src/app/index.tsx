@@ -41,6 +41,28 @@ const readError = async (response: Response, fallback: string): Promise<string> 
   return fallback;
 };
 
+// TikTok'un gerçek logosu, siyah ikonun arkasında hafif kaymış camgöbeği (cyan) ve
+// pembe-kırmızı (magenta) katmanlardan oluşan bir "glitch" efektiyle oluşuyor.
+// Tek renkli bir ikon yerine bu üç katmanı üst üste koyunca orijinaline çok daha yakın duruyor.
+function TikTokGlitchIcon({ size, active }: { size: number; active: boolean }) {
+  if (!active) {
+    return <FontAwesome5 name="tiktok" size={size} color="#64748B" />;
+  }
+  return (
+    <View style={{ width: size, height: size }}>
+      <FontAwesome5
+        name="tiktok" size={size} color="#25F4EE"
+        style={{ position: 'absolute', left: -1.5, top: 1 }}
+      />
+      <FontAwesome5
+        name="tiktok" size={size} color="#FE2C55"
+        style={{ position: 'absolute', left: 1.5, top: -1 }}
+      />
+      <FontAwesome5 name="tiktok" size={size} color="#0A0A0A" style={{ position: 'absolute' }} />
+    </View>
+  );
+}
+
 export default function App() {
   const [url, setUrl] = useState('');
   const [activePlatform, setActivePlatform] = useState<Platform_>('instagram');
@@ -276,7 +298,7 @@ export default function App() {
               style={[styles.platformBtn, activePlatform === 'tiktok' && styles.activeTiktok]}
               onPress={() => handleTabPress('tiktok')}
             >
-              <FontAwesome5 name="tiktok" size={26} color={activePlatform === 'tiktok' ? '#111' : '#64748B'} />
+              <TikTokGlitchIcon size={26} active={activePlatform === 'tiktok'} />
             </TouchableOpacity>
           </View>
 
@@ -331,6 +353,8 @@ export default function App() {
                 <View style={styles.fallbackThumbnail}>
                   {activePlatform === 'x' ? (
                     <Text style={[styles.xLogoText, { color: '#00F2FE', fontSize: 36 }]}>𝕏</Text>
+                  ) : activePlatform === 'tiktok' ? (
+                    <TikTokGlitchIcon size={40} active />
                   ) : (
                     <FontAwesome5 name={activePlatform} size={40} color="#00F2FE" />
                   )}
@@ -397,7 +421,9 @@ export default function App() {
             <View key={i} style={styles.logoRow}>
               <FontAwesome5 name="instagram" size={45} color="#FFFFFF" style={styles.neonInsta} />
               <Text style={[styles.neonXText, styles.neonX]}>𝕏</Text>
-              <FontAwesome5 name="tiktok" size={45} color="#FFFFFF" style={styles.neonTiktok} />
+              <View style={styles.neonTiktokWrap}>
+                <TikTokGlitchIcon size={45} active />
+              </View>
             </View>
           ))}
         </Animated.View>
@@ -415,7 +441,7 @@ const styles = StyleSheet.create({
   neonInsta: { marginHorizontal: 35, textShadowColor: '#E1306C', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
   neonXText: { fontSize: 42, fontWeight: '900', marginHorizontal: 35, color: '#FFFFFF' },
   neonX: { textShadowColor: '#FFFFFF', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
-  neonTiktok: { marginHorizontal: 35, textShadowColor: '#FF0050', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
+  neonTiktokWrap: { marginHorizontal: 35, shadowColor: '#25F4EE', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 12, elevation: 12 },
 
   content: { flex: 1, zIndex: 1, marginBottom: 70 },
   scrollArea: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40, alignItems: 'center' },
@@ -428,7 +454,7 @@ const styles = StyleSheet.create({
 
   activeInstagram: { backgroundColor: '#E1306C', borderWidth: 1.5, borderColor: '#FF70A6', shadowColor: '#E1306C', elevation: 12, shadowOpacity: 0.8, shadowRadius: 10 },
   activeX: { backgroundColor: '#14171A', borderWidth: 1.5, borderColor: '#657786', shadowColor: '#FFFFFF', elevation: 12, shadowOpacity: 0.8, shadowRadius: 10 },
-  activeTiktok: { backgroundColor: '#0073ff', borderWidth: 1.5, borderColor: '#FF758C', shadowColor: '#FF0050', elevation: 12, shadowOpacity: 0.8, shadowRadius: 12 },
+  activeTiktok: { backgroundColor: '#0A0E17', borderWidth: 1.5, borderColor: '#25F4EE', shadowColor: '#25F4EE', elevation: 12, shadowOpacity: 0.9, shadowRadius: 14 },
 
   inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0F101A', borderRadius: 16, borderWidth: 1, borderColor: '#2A2F4C', marginBottom: 10, paddingHorizontal: 16, width: '100%', shadowColor: '#00F2FE', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5 },
   clearBtn: { marginRight: 10 },
@@ -452,6 +478,6 @@ const styles = StyleSheet.create({
   downloadBtn: { flexDirection: 'row', width: '100%', paddingVertical: 18, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8 },
   btnInstagram: { backgroundColor: '#E1306C', shadowColor: '#E1306C' },
   btnX: { backgroundColor: '#14171A', shadowColor: '#FFFFFF', borderWidth: 1, borderColor: '#657786' },
-  btnTiktok: { backgroundColor: '#FF0050', shadowColor: '#FF0050' },
+  btnTiktok: { backgroundColor: '#0A0E17', borderWidth: 1, borderColor: '#25F4EE', shadowColor: '#25F4EE' },
   downloadBtnText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', letterSpacing: 0.5 }
 });
