@@ -26,14 +26,22 @@ async def info_instagram(request: VideoRequest):
 async def download_instagram(request: VideoRequest):
     file_id = str(uuid.uuid4())
     os.makedirs("downloads", exist_ok=True)
+    
+    # Ses ve videonun kusursuz birleşmesi ve dönüştürülmesi için uzantısız şablon kullanıyoruz
+    outtmpl_path = f"downloads/{file_id}"
     final_filepath = f"downloads/{file_id}.mp4"
     
     ydl_opts = {
         'quiet': True,
-        'format': 'best[ext=mp4]/best', 
-        'format_sort': ['vcodec:h264', 'vcodec:avc1', 'acodec:aac'],
-        'outtmpl': final_filepath,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        'format': 'bestvideo+bestaudio/best', 
+        'merge_output_format': 'mp4',
+        'outtmpl': outtmpl_path,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        # TÜM CİHAZLARDACILMASI İÇİN: Videoyu evrensel H.264 ve AAC formatına zorlıyoruz
+        'postprocessors': [{
+            'key': 'FFmpegVideoConvertor',
+            'preferedformat': 'mp4',
+        }],
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -43,5 +51,6 @@ async def download_instagram(request: VideoRequest):
             raise Exception("Bozuk dosya")
             
         return FileResponse(final_filepath, media_type="video/mp4", filename="ig_video.mp4")
-    except Exception:
+    except Exception as e:
+        print("İndirme/Dönüştürme Hatası:", e)
         raise HTTPException(status_code=400, detail="Instagram indirme başarısız.")
