@@ -22,20 +22,46 @@ def info_youtube(request: VideoRequest):
 
 @router.post("/download-youtube")
 async def download_youtube(request: VideoRequest):
-    # Harici servisleri tamamen kaldırıyoruz. 
-    # YouTube video ID'sini alıp doğrudan güvenli ve hızlı alternatif redirect kullanan resmi yönlendiriciye bağlıyoruz.
     url = request.url.strip()
-    
     if not url:
         raise HTTPException(status_code=400, detail="Geçersiz URL.")
 
+    # Dünyanın en stabil açık kaynaklı video indirme altyapısı (Cobalt API)
+    cobalt_api = "https://api.cobalt.tools/api/json"
+    
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0"
+    }
+    
+    payload = {
+        "url": url,
+        "vQuality": request.quality if request.quality != "best" else "720",
+        "filenamePattern": "basic"
+    }
+
     try:
-        # İsteyen istemciye (telefon veya PC) doğrudan güvenli oynatma/indirme kaynağını veriyoruz
-        # Bu yöntem sunucuyu yormaz ve IP banına takılmaz.
-        return JSONResponse({
-            "direct_url": f"https://p.sihy.workers.dev/?url={url}",
-            "title": "youtube_video.mp4"
-        })
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            res = await client.post(cobalt_api, json=payload, headers=headers)
+            if res.status_code != 200:
+                raise Exception(f"Cobalt API Hatası: {res.status_code}")
+                
+            data = res.json()
+            
+            # Cobalt API yanıt türleri: redirect, tunnel veya picker olabilir
+            download_link = data.get("url")
+            if not download_link and "picker" in data:
+                download_link = data["picker"][0].get("url")
+
+            if not download_link:
+                raise Exception("İndirme linki oluşturulamadı.")
+
+            return JSONResponse({
+                "direct_url": download_link,
+                "title": "youtube_video.mp4"
+            })
+
     except Exception as e:
         print("YouTube İndirme Hatası:", e)
-        raise HTTPException(status_code=400, detail="YouTube videosu işlenemedi.")
+        raise HTTPException(status_code=400, detail="YouTube videosu indirilemedi.")
