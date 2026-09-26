@@ -1,9 +1,7 @@
-"""Ortak yardımcılar: yt-dlp ayarları, çerez/proxy, geçici dosya temizliği, hata metinleri."""
-import base64
+"""Ortak yardımcılar: yt-dlp ayarları, geçici dosya temizliği, hata metinleri."""
 import os
 import re
 import shutil
-import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -16,6 +14,8 @@ MAX_FILE_AGE_SECONDS = 60 * 60  # 1 saatten eski geçici dosyalar silinir
 URL_RE = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
+DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+
 
 # --------------------------------------------------------------------------- #
 # URL
@@ -25,6 +25,18 @@ def extract_url(text: str) -> str:
     text = (text or "").strip()
     m = URL_RE.search(text)
     return m.group(0).rstrip(").,;") if m else text
+
+
+def resolve_redirect(url: str, hosts: tuple) -> str:
+    """Kısa/yönlendirme linklerini (vm.tiktok.com, t.co, ...) gerçek adrese çevirir."""
+    if any(h in url for h in hosts):
+        try:
+            import httpx
+            r = httpx.get(url, headers={"User-Agent": DESKTOP_UA}, follow_redirects=True, timeout=12)
+            return str(r.url).split("?")[0]
+        except Exception as e:
+            print("Yönlendirme çözülemedi:", e)
+    return url
 
 
 # --------------------------------------------------------------------------- #
@@ -83,35 +95,11 @@ def ffmpeg_path() -> Optional[str]:
         return None
 
 
-def _cookie_source(env_b64: str, env_path: str) -> Optional[str]:
-    """Çerezi ORTAMDAN al (repoya asla commit etme). Base64 env veya dosya yolu."""
-    b64 = os.getenv(env_b64) or os.getenv("COOKIES_B64")
-    if b64:
-        try:
-            fd, tmp = tempfile.mkstemp(suffix=".txt")
-            with os.fdopen(fd, "wb") as f:
-                f.write(base64.b64decode(b64))
-            return tmp
-        except Exception as e:
-            print("Çerez çözülemedi:", e)
-            return None
-    src = os.getenv(env_path) or os.getenv("COOKIES_FILE")
-    if src and os.path.exists(src):
-        # yt-dlp cookie dosyasına geri yazar; Render'daki salt-okunur secret file'da hata olmasın diye kopyala
-        fd, tmp = tempfile.mkstemp(suffix=".txt")
-        os.close(fd)
-        shutil.copyfile(src, tmp)
-        return tmp
-    return None
-
-
-def base_ydl_opts(platform: str = "") -> dict:
+def base_ydl_opts() -> dict:
     """
     Tüm platformlar için ortak yt-dlp ayarları.
-    Ortam değişkenleri:
-      PROXY_URL           -> http://user:pass@host:port  (datacenter IP engelini aşmak için)
-      YT_COOKIES_B64      -> base64(cookies.txt)   (sadece YouTube)
-      YT_COOKIES_FILE     -> cookies.txt yolu      (sadece YouTube)
+    Ortam değişkeni:
+      PROXY_URL -> http://user:pass@host:port  (bir platform IP'yi engellerse)
     """
     opts: dict = {
         "quiet": True,
@@ -120,9 +108,7 @@ def base_ydl_opts(platform: str = "") -> dict:
         "socket_timeout": 25,
         "retries": 3,
         "fragment_retries": 3,
-        "nocheckcertificate": False,
-        # YouTube imza/n-challenge çözümü için JS runtime gerekir (deno pip paketiyle gelir, node da olur)
-        "js_runtimes": {"deno": {}, "node": {}},
+        "http_headers": {"User-Agent": DESKTOP_UA},
         "merge_output_format": "mp4",
     }
     ff = ffmpeg_path()
@@ -131,75 +117,52 @@ def base_ydl_opts(platform: str = "") -> dict:
     proxy = os.getenv("PROXY_URL")
     if proxy:
         opts["proxy"] = proxy
-    if platform == "youtube":
-        ck = _cookie_source("YT_COOKIES_B64", "YT_COOKIES_FILE")
-        if ck:
-            opts["cookiefile"] = ck
-        home = pot_server_home()
-        if home:
-            # PO Token üretici (bgutil, script modu). Client listesi ayrı 'youtube' anahtarında verilir.
-            opts["extractor_args"] = {"youtubepot-bgutilscript": {"server_home": [home]}}
     return opts
 
 
-def pot_server_home() -> Optional[str]:
-    """build_pot.sh ile kurulan bgutil sağlayıcısının yolu (yoksa None)."""
-    candidates = [
-        os.getenv("BGUTIL_HOME"),
-        str(Path(__file__).resolve().parent / "bgutil-ytdlp-pot-provider" / "server"),
-    ]
-    for c in candidates:
-        if c and (Path(c) / "build" / "generate_once.js").exists():
-            return c
-    return None
-
-
-def set_youtube_clients(opts: dict, clients) -> None:
-    """player_client'ı, PO Token ayarlarını ezmeden ekle."""
-    if clients:
-        opts.setdefault("extractor_args", {})["youtube"] = {"player_client": clients}
-
-
 def try_impersonate(opts: dict) -> dict:
-    """curl_cffi kuruluysa TikTok'un TLS parmak izi kontrolünü geçmek için tarayıcı taklidi yap."""
+    """curl_cffi kuruluysa TLS parmak izi kontrollerini geçmek için tarayıcı taklidi yap."""
     try:
         import curl_cffi  # noqa: F401
         from yt_dlp.networking.impersonate import ImpersonateTarget
+        opts = dict(opts)
         opts["impersonate"] = ImpersonateTarget("chrome")
     except Exception:
         pass
     return opts
 
 
-def cleanup_cookiefile(opts: dict) -> None:
-    ck = opts.get("cookiefile")
-    if ck and ck.startswith(tempfile.gettempdir()):
-        try:
-            os.unlink(ck)
-        except OSError:
-            pass
+def ydl_attempts() -> list:
+    """Sırayla denenecek yt-dlp ayarları: önce sade, olmazsa Chrome taklidiyle."""
+    return [base_ydl_opts(), try_impersonate(base_ydl_opts())]
 
 
 # --------------------------------------------------------------------------- #
 # Hata mesajları
 # --------------------------------------------------------------------------- #
+def short_error(e: Exception) -> str:
+    raw = ANSI_RE.sub("", str(e)).replace("ERROR: ", "").strip()
+    return raw.splitlines()[0][:160] if raw else "Bilinmeyen hata"
+
+
 def friendly_error(e: Exception, platform: str) -> str:
     raw = ANSI_RE.sub("", str(e))
     low = raw.lower()
-    if "sign in to confirm" in low or "not a bot" in low:
-        return ("YouTube bu sunucunun IP'sini bot olarak işaretledi. Sunucuya PROXY_URL "
-                "veya YT_COOKIES_B64 ortam değişkeni eklemek gerekiyor.")
-    if "po token" in low or "po_token" in low:
-        return "YouTube bu istemci için PO Token istiyor; yt-dlp'yi güncelleyip yeniden deploy edin."
-    if "requested format is not available" in low:
-        return "İstenen kalite bulunamadı (ffmpeg/JS runtime eksik olabilir)."
-    if "private" in low or "login required" in low or "log in" in low:
-        return "Video özel veya giriş gerektiriyor."
-    if "unavailable" in low or "removed" in low or "not exist" in low:
-        return "Video bulunamadı veya kaldırılmış."
+    if "private" in low or "login required" in low or "log in" in low or "giriş" in low:
+        return "İçerik özel veya giriş gerektiriyor, bu yüzden indirilemiyor."
+    if "unavailable" in low or "removed" in low or "not exist" in low or "not available" in low:
+        return "İçerik bulunamadı, silinmiş veya kaldırılmış olabilir."
+    if "no video" in low or "no media" in low or "sadece" in low:
+        return "Bu gönderide indirilebilir bir video bulunamadı."
     if "403" in low or "forbidden" in low or "blocked" in low:
-        return f"{platform} sunucuyu engelledi (403). Proxy veya farklı IP gerekebilir."
+        return f"{platform} bu isteği engelledi (403). Biraz sonra tekrar deneyin."
     if "timed out" in low or "timeout" in low:
         return "Bağlantı zaman aşımına uğradı, tekrar deneyin."
-    short = raw.replace("ERROR: ", "").strip().splitlines()[0] if raw.strip() else "Bilinmeyen hata"
-    return f"{platform} hatası: {short[:200]}"
+    if "429" in low or "rate" in low and "limit" in low:
+        return f"{platform} çok fazla istek nedeniyle geçici olarak sınırladı, biraz sonra tekrar deneyin."
+    return f"{platform} hatası: {short_error(e)}"
+
+
+def final_error(errors: list, platform: str) -> Exception:
+    """Birden çok denemenin en açıklayıcı hatasını seçer."""
+    return errors[0] if errors else RuntimeError("Bilinmeyen hata")

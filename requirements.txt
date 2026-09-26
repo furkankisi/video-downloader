@@ -2,6 +2,5 @@ fastapi
 uvicorn[standard]
 pydantic
 httpx
-yt-dlp[default,curl-cffi,deno]
+yt-dlp[default,curl-cffi]
 imageio-ffmpeg
-bgutil-ytdlp-pot-provider==2.0.0
