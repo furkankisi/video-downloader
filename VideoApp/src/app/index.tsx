@@ -245,11 +245,11 @@ export default function App() {
           {/* Voxel / Piksel Retro Logo ve Başlık */}
           <View style={styles.headerContainer}>
             <Image 
-              source={require('./assets/pixel-logo.png')} 
+              source={require('../assets/pixel-logo.png')} 
               style={styles.logoImage} 
               resizeMode="contain" 
             />
-            <Text style={styles.title}>VideoSaver <Text style={styles.proBadge}>PRO</Text></Text>
+            <Text style={styles.title}>BitSaver <Text style={styles.proBadge}>PRO</Text></Text>
           </View>
           <Text style={styles.subtitle}>[ RETRO BIT-DOWNLOAD SYSTEM v2.0 ]</Text>
 
