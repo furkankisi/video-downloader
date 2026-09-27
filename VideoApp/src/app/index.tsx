@@ -392,7 +392,7 @@ export default function App() {
         <Animated.View style={[styles.movingBackground, { transform: [{ translateX: scrollX }] }]}>
           {[...Array(8)].map((_, i) => (
             <View key={i} style={styles.logoRow}>
-              <Image source={require('./assets/pixel-logo.png')} style={styles.movingIcon} resizeMode="contain" />
+              <Image source={require('../assets/images/pixel-logo.png')} style={styles.movingIcon} resizeMode="contain" />
               <FontAwesome5 name="instagram" size={28} color="#A78BFA" style={{ marginHorizontal: 25 }} />
               <Text style={{ fontSize: 28, fontWeight: '900', color: '#EC4899', marginHorizontal: 25 }}>𝕏</Text>
               <FontAwesome5 name="tiktok" size={28} color="#25F4EE" style={{ marginHorizontal: 25 }} />
