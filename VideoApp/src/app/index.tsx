@@ -245,7 +245,7 @@ export default function App() {
           {/* Voxel / Piksel Retro Logo ve Başlık */}
           <View style={styles.headerContainer}>
             <Image 
-              source={require('../assets/pixel-logo.png')}
+              source={require('../assets/images/pixel-logo.png')}
               style={styles.logoImage} 
               resizeMode="contain" 
             />
