@@ -242,30 +242,38 @@ export default function App() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.content}>
         <ScrollView contentContainerStyle={styles.scrollArea} showsVerticalScrollIndicator={false}>
 
-          <Text style={styles.title}>VideoSaver <Text style={styles.proBadge}>PRO</Text></Text>
-          <Text style={styles.subtitle}>Instagram, X ve TikTok videolarını saniyeler içinde indir</Text>
+          {/* Voxel / Piksel Retro Logo ve Başlık */}
+          <View style={styles.headerContainer}>
+            <Image 
+              source={require('./assets/pixel-logo.png')} 
+              style={styles.logoImage} 
+              resizeMode="contain" 
+            />
+            <Text style={styles.title}>VideoSaver <Text style={styles.proBadge}>PRO</Text></Text>
+          </View>
+          <Text style={styles.subtitle}>[ RETRO BIT-DOWNLOAD SYSTEM v2.0 ]</Text>
 
-          {/* Platform Seçici (Instagram - X - TikTok) */}
+          {/* Platform Seçici (Pixel / Voxel Tarzı) */}
           <View style={styles.platformSelector}>
             <TouchableOpacity
               style={[styles.platformBtn, activePlatform === 'instagram' && styles.activeInstagram]}
               onPress={() => handleTabPress('instagram')}
             >
-              <FontAwesome5 name="instagram" size={26} color={activePlatform === 'instagram' ? '#FFF' : '#64748B'} />
+              <FontAwesome5 name="instagram" size={24} color={activePlatform === 'instagram' ? '#FFF' : '#A78BFA'} />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.platformBtn, activePlatform === 'x' && styles.activeX]}
               onPress={() => handleTabPress('x')}
             >
-              <Text style={[styles.xLogoText, { color: activePlatform === 'x' ? '#FFF' : '#64748B' }]}>𝕏</Text>
+              <Text style={[styles.xLogoText, { color: activePlatform === 'x' ? '#FFF' : '#A78BFA' }]}>𝕏</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.platformBtn, activePlatform === 'tiktok' && styles.activeTiktok]}
               onPress={() => handleTabPress('tiktok')}
             >
-              <FontAwesome5 name="tiktok" size={26} color={activePlatform === 'tiktok' ? '#FFF' : '#64748B'} />
+              <FontAwesome5 name="tiktok" size={24} color={activePlatform === 'tiktok' ? '#FFF' : '#A78BFA'} />
             </TouchableOpacity>
           </View>
 
@@ -278,8 +286,8 @@ export default function App() {
             )}
             <TextInput
               style={styles.input}
-              placeholder={`${platformLabel} linkini yapıştırın...`}
-              placeholderTextColor="#64748B"
+              placeholder={`${platformLabel} linkini giriniz...`}
+              placeholderTextColor="#6B7280"
               value={url}
               onChangeText={handleUrlChange}
               editable={!isDownloading}
@@ -287,20 +295,20 @@ export default function App() {
               autoCorrect={false}
             />
             <TouchableOpacity style={styles.pasteBtn} onPress={handlePaste} disabled={isDownloading}>
-              <Ionicons name="clipboard-outline" size={24} color="#00F2FE" />
+              <Ionicons name="clipboard-outline" size={22} color="#EC4899" />
             </TouchableOpacity>
           </View>
 
           {url.length === 0 && (
             <Text style={styles.hintText}>
-              Yalnızca herkese açık gönderiler indirilebilir. Paylaşım metnini olduğu gibi de yapıştırabilirsiniz.
+              &gt; Herkese açık video ve gönderi linklerini yapıştırabilirsiniz.
             </Text>
           )}
 
           {isLoadingInfo && (
             <View style={styles.loadingInfoContainer}>
-              <ActivityIndicator color="#00F2FE" size="small" />
-              <Text style={styles.loadingInfoText}>{platformLabel} gönderisi taranıyor...</Text>
+              <ActivityIndicator color="#EC4899" size="small" />
+              <Text style={styles.loadingInfoText}>[ BIT SCANNING... ]</Text>
             </View>
           )}
 
@@ -319,17 +327,17 @@ export default function App() {
               ) : (
                 <View style={styles.fallbackThumbnail}>
                   {activePlatform === 'x' ? (
-                    <Text style={[styles.xLogoText, { color: '#00F2FE', fontSize: 36 }]}>𝕏</Text>
+                    <Text style={[styles.xLogoText, { color: '#EC4899', fontSize: 32 }]}>𝕏</Text>
                   ) : (
-                    <FontAwesome5 name={activePlatform} size={40} color="#00F2FE" />
+                    <FontAwesome5 name={activePlatform} size={36} color="#EC4899" />
                   )}
-                  <Text style={styles.fallbackText}>{platformLabel} Videosu</Text>
+                  <Text style={styles.fallbackText}>[ {platformLabel} DATA ]</Text>
                 </View>
               )}
               <View style={styles.titleContainer}>
-                <Ionicons name="checkmark-circle" size={20} color="#10B981" style={{ marginRight: 6 }} />
+                <Ionicons name="checkmark-done-circle" size={20} color="#10B981" style={{ marginRight: 6 }} />
                 <Text style={styles.videoTitle} numberOfLines={2}>
-                  {videoInfo?.title || `${platformLabel} Bağlantısı Hazır`}
+                  {videoInfo?.title || `${platformLabel} Verisi Hazır`}
                 </Text>
               </View>
             </View>
@@ -351,12 +359,12 @@ export default function App() {
               {isDownloading ? (
                 <>
                   <ActivityIndicator color="#FFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.downloadBtnText}>İndiriliyor...</Text>
+                  <Text style={styles.downloadBtnText}>İNDİRİLİYOR...</Text>
                 </>
               ) : (
                 <>
-                  <Ionicons name="cloud-download-outline" size={24} color="white" style={{ marginRight: 8 }} />
-                  <Text style={styles.downloadBtnText}>Videoyu İndir</Text>
+                  <Ionicons name="cloud-download-outline" size={22} color="white" style={{ marginRight: 8 }} />
+                  <Text style={styles.downloadBtnText}>VİDEOYU İNDİR [RETRO]</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -372,21 +380,22 @@ export default function App() {
           {downloadSuccess && !isDownloading && !downloadError && (
             <View style={[styles.successCard, { marginTop: 16 }]}>
               <Ionicons name="checkmark-circle" size={20} color="#10B981" style={{ marginRight: 8 }} />
-              <Text style={styles.successText}>Video indirildi.</Text>
+              <Text style={styles.successText}>[ BAŞARILI ] Video indirildi.</Text>
             </View>
           )}
 
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Alt Animasyon Şeridi (Sade ve Klasik) */}
+      {/* Alt Voxel/Bit Animasyon Şeridi */}
       <View style={styles.bottomAnimationContainer} pointerEvents="none">
         <Animated.View style={[styles.movingBackground, { transform: [{ translateX: scrollX }] }]}>
           {[...Array(8)].map((_, i) => (
             <View key={i} style={styles.logoRow}>
-              <FontAwesome5 name="instagram" size={45} color="#FFFFFF" style={styles.neonInsta} />
-              <Text style={[styles.neonXText, styles.neonX]}>𝕏</Text>
-              <FontAwesome5 name="tiktok" size={45} color="#FFFFFF" style={styles.neonTiktok} />
+              <Image source={require('./assets/pixel-logo.png')} style={styles.movingIcon} resizeMode="contain" />
+              <FontAwesome5 name="instagram" size={28} color="#A78BFA" style={{ marginHorizontal: 25 }} />
+              <Text style={{ fontSize: 28, fontWeight: '900', color: '#EC4899', marginHorizontal: 25 }}>𝕏</Text>
+              <FontAwesome5 name="tiktok" size={28} color="#25F4EE" style={{ marginHorizontal: 25 }} />
             </View>
           ))}
         </Animated.View>
@@ -396,51 +405,52 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#030307' },
-  bottomAnimationContainer: { position: 'absolute', bottom: 10, left: 0, right: 0, height: 60, justifyContent: 'center', overflow: 'hidden' },
+  container: { flex: 1, backgroundColor: '#0A0518' },
+  bottomAnimationContainer: { position: 'absolute', bottom: 10, left: 0, right: 0, height: 50, justifyContent: 'center', overflow: 'hidden', borderTopWidth: 2, borderBottomWidth: 2, borderColor: '#3B0764', backgroundColor: '#110826' },
   movingBackground: { flexDirection: 'row', width: 4000 },
   logoRow: { flexDirection: 'row', alignItems: 'center' },
+  movingIcon: { width: 32, height: 32, marginHorizontal: 25 },
 
-  neonInsta: { marginHorizontal: 35, textShadowColor: '#E1306C', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
-  neonXText: { fontSize: 42, fontWeight: '900', marginHorizontal: 35, color: '#FFFFFF' },
-  neonX: { textShadowColor: '#FFFFFF', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
-  neonTiktok: { marginHorizontal: 35, textShadowColor: '#FF0050', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
-
-  content: { flex: 1, zIndex: 1, marginBottom: 70 },
+  content: { flex: 1, zIndex: 1, marginBottom: 65 },
   scrollArea: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40, alignItems: 'center' },
-  title: { fontSize: 36, fontWeight: '900', color: '#FFFFFF', letterSpacing: 1.5, textAlign: 'center', textShadowColor: '#00F2FE', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 },
-  proBadge: { fontSize: 16, color: '#00F2FE', fontWeight: 'bold' },
-  subtitle: { color: '#64748B', fontSize: 13, textAlign: 'center', marginTop: 6, marginBottom: 26 },
-  platformSelector: { flexDirection: 'row', backgroundColor: '#0F101A', borderRadius: 20, padding: 8, marginBottom: 25, width: '100%', justifyContent: 'space-between', borderWidth: 1, borderColor: '#1E2238' },
-  platformBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 14 },
-  xLogoText: { fontSize: 26, fontWeight: '900' },
+  
+  headerContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  logoImage: { width: 48, height: 48, marginRight: 12 },
+  title: { fontSize: 32, fontWeight: '900', color: '#FFFFFF', letterSpacing: 2, textShadowColor: '#EC4899', textShadowOffset: { width: 2, height: 2 }, textShadowRadius: 0 },
+  proBadge: { fontSize: 16, color: '#25F4EE', fontWeight: 'bold' },
+  subtitle: { color: '#A78BFA', fontSize: 11, textAlign: 'center', marginBottom: 26, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 1 },
 
-  activeInstagram: { backgroundColor: '#E1306C', borderWidth: 1.5, borderColor: '#FF70A6', shadowColor: '#E1306C', elevation: 12, shadowOpacity: 0.8, shadowRadius: 10 },
-  activeX: { backgroundColor: '#14171A', borderWidth: 1.5, borderColor: '#657786', shadowColor: '#FFFFFF', elevation: 12, shadowOpacity: 0.8, shadowRadius: 10 },
-  activeTiktok: { backgroundColor: '#FF0050', borderWidth: 1.5, borderColor: '#FF758C', shadowColor: '#FF0050', elevation: 12, shadowOpacity: 0.9, shadowRadius: 14 },
+  platformSelector: { flexDirection: 'row', backgroundColor: '#170E33', borderRadius: 6, padding: 6, marginBottom: 24, width: '100%', justifyContent: 'space-between', borderWidth: 2, borderColor: '#4C1D95' },
+  platformBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 4 },
+  xLogoText: { fontSize: 24, fontWeight: '900' },
 
-  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0F101A', borderRadius: 16, borderWidth: 1, borderColor: '#2A2F4C', marginBottom: 10, paddingHorizontal: 16, width: '100%', shadowColor: '#00F2FE', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5 },
+  activeInstagram: { backgroundColor: '#8B5CF6', borderWidth: 2, borderColor: '#C4B5FD', shadowColor: '#8B5CF6', elevation: 8 },
+  activeX: { backgroundColor: '#31104D', borderWidth: 2, borderColor: '#A78BFA', shadowColor: '#A78BFA', elevation: 8 },
+  activeTiktok: { backgroundColor: '#EC4899', borderWidth: 2, borderColor: '#F472B6', shadowColor: '#EC4899', elevation: 8 },
+
+  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#170E33', borderRadius: 8, borderWidth: 2, borderColor: '#4C1D95', marginBottom: 12, paddingHorizontal: 16, width: '100%', shadowColor: '#EC4899', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.3, shadowRadius: 0, elevation: 4 },
   clearBtn: { marginRight: 10 },
-  input: { flex: 1, paddingVertical: 18, color: '#F8FAFC', fontSize: 16 },
+  input: { flex: 1, paddingVertical: 16, color: '#F8FAFC', fontSize: 15 },
   pasteBtn: { padding: 10 },
-  hintText: { color: '#475569', fontSize: 12, textAlign: 'center', marginBottom: 20, paddingHorizontal: 8 },
-  errorCard: { flexDirection: 'row', alignItems: 'center', width: '100%', backgroundColor: '#1F0F14', borderRadius: 14, borderWidth: 1, borderColor: '#EF4444', padding: 12, marginBottom: 20 },
-  errorText: { color: '#FCA5A5', fontSize: 13, flex: 1 },
-  successCard: { flexDirection: 'row', alignItems: 'center', width: '100%', backgroundColor: '#0F1F16', borderRadius: 14, borderWidth: 1, borderColor: '#10B981', padding: 12 },
-  successText: { color: '#6EE7B7', fontSize: 13, flex: 1 },
+  hintText: { color: '#8B5CF6', fontSize: 11, textAlign: 'center', marginBottom: 20, paddingHorizontal: 8, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+  
+  errorCard: { flexDirection: 'row', alignItems: 'center', width: '100%', backgroundColor: '#2A121A', borderRadius: 6, borderWidth: 2, borderColor: '#EF4444', padding: 12, marginBottom: 20 },
+  errorText: { color: '#FCA5A5', fontSize: 12, flex: 1 },
+  successCard: { flexDirection: 'row', alignItems: 'center', width: '100%', backgroundColor: '#0F2A1E', borderRadius: 6, borderWidth: 2, borderColor: '#10B981', padding: 12 },
+  successText: { color: '#6EE7B7', fontSize: 12, flex: 1 },
   loadingInfoContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  loadingInfoText: { color: '#00F2FE', marginLeft: 8, fontSize: 14, fontWeight: '600' },
+  loadingInfoText: { color: '#EC4899', marginLeft: 8, fontSize: 13, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
 
-  previewCard: { width: '100%', backgroundColor: '#0F101A', borderRadius: 20, padding: 14, borderWidth: 1, borderColor: '#00F2FE', marginBottom: 20, alignItems: 'center', shadowColor: '#00F2FE', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 },
-  thumbnail: { width: '100%', height: 140, borderRadius: 12, marginBottom: 12, backgroundColor: '#1E2238' },
-  fallbackThumbnail: { width: '100%', height: 100, borderRadius: 12, marginBottom: 12, backgroundColor: '#161B2E', justifyContent: 'center', alignItems: 'center' },
-  fallbackText: { color: '#94A3B8', fontSize: 12, marginTop: 6, fontWeight: '600' },
+  previewCard: { width: '100%', backgroundColor: '#170E33', borderRadius: 8, padding: 14, borderWidth: 2, borderColor: '#8B5CF6', marginBottom: 20, alignItems: 'center', shadowColor: '#8B5CF6', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.4, shadowRadius: 0, elevation: 6 },
+  thumbnail: { width: '100%', height: 140, borderRadius: 4, marginBottom: 12, backgroundColor: '#110826' },
+  fallbackThumbnail: { width: '100%', height: 100, borderRadius: 4, marginBottom: 12, backgroundColor: '#110826', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#3B0764' },
+  fallbackText: { color: '#A78BFA', fontSize: 11, marginTop: 6, fontWeight: '600', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
   titleContainer: { flexDirection: 'row', alignItems: 'center', width: '100%', paddingHorizontal: 4 },
-  videoTitle: { color: '#F8FAFC', fontSize: 14, fontWeight: '600', flex: 1 },
+  videoTitle: { color: '#F8FAFC', fontSize: 13, fontWeight: '600', flex: 1 },
 
-  downloadBtn: { flexDirection: 'row', width: '100%', paddingVertical: 18, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8 },
-  btnInstagram: { backgroundColor: '#E1306C', shadowColor: '#E1306C' },
-  btnX: { backgroundColor: '#14171A', shadowColor: '#FFFFFF', borderWidth: 1, borderColor: '#657786' },
-  btnTiktok: { backgroundColor: '#FF0050', shadowColor: '#FF0050' },
-  downloadBtnText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', letterSpacing: 0.5 }
+  downloadBtn: { flexDirection: 'row', width: '100%', paddingVertical: 18, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#F472B6', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.6, shadowRadius: 0, elevation: 8 },
+  btnInstagram: { backgroundColor: '#7C3AED', shadowColor: '#7C3AED' },
+  btnX: { backgroundColor: '#1F1033', shadowColor: '#EC4899' },
+  btnTiktok: { backgroundColor: '#DB2777', shadowColor: '#DB2777' },
+  downloadBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 1 }
 });
