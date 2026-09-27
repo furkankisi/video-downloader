@@ -5,8 +5,9 @@ from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
 from common import (
-    MIN_FILE_SIZE, VIDEO_FORMAT, ensure_h264, extract_url, final_error, find_output,
-    friendly_error, new_output_path, remove_files_with_stem, ydl_attempts,
+    MIN_FILE_SIZE, VIDEO_FORMAT, cleanup_cookiefile, cookie_source, ensure_h264,
+    extract_url, final_error, find_output, friendly_error, new_output_path,
+    remove_files_with_stem, ydl_attempts,
 )
 
 router = APIRouter()
@@ -14,6 +15,20 @@ router = APIRouter()
 
 class VideoRequest(BaseModel):
     url: str
+
+
+def _ig_ydl_attempts():
+    """
+    2026 itibarıyla Instagram, herkese açık gönderilerin çoğunda da giriş yapılmış bir
+    hesap istiyor ("rate-limit reached or login required" hatası). Bu, yt-dlp'nin kendi
+    hata mesajında da belirttiği, kodla değil ancak çerezle çözülebilen bir durum.
+    IG_COOKIES_B64 (veya IG_COOKIES_FILE) tanımlıysa her denemeye ekleniyor.
+    """
+    ck = cookie_source("IG_COOKIES_B64", "IG_COOKIES_FILE")
+    for opts in ydl_attempts():
+        if ck:
+            opts["cookiefile"] = ck
+        yield opts
 
 
 # ÖNEMLİ: bu iki endpoint önceden 'async def' idi ve içeride yt-dlp'nin senkron (bloklayan)
@@ -25,7 +40,7 @@ class VideoRequest(BaseModel):
 def info_instagram(request: VideoRequest):
     url = extract_url(request.url)
     errors = []
-    for opts in ydl_attempts():
+    for opts in _ig_ydl_attempts():
         try:
             with yt_dlp.YoutubeDL({**opts, "skip_download": True}) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -33,6 +48,8 @@ def info_instagram(request: VideoRequest):
         except Exception as e:
             errors.append(e)
             print("Instagram bilgi hatası:", e)
+        finally:
+            cleanup_cookiefile(opts)
     raise HTTPException(status_code=400, detail=friendly_error(final_error(errors, "Instagram"), "Instagram"))
 
 
@@ -40,7 +57,7 @@ def _download_core(link: str) -> FileResponse:
     url = extract_url(link)
     out = new_output_path("mp4")
     errors = []
-    for opts in ydl_attempts():
+    for opts in _ig_ydl_attempts():
         try:
             opts["format"] = VIDEO_FORMAT
             opts["outtmpl"] = str(out.with_suffix("")) + ".%(ext)s"
@@ -56,6 +73,8 @@ def _download_core(link: str) -> FileResponse:
             errors.append(e)
             print("Instagram indirme hatası:", e)
             remove_files_with_stem(out)
+        finally:
+            cleanup_cookiefile(opts)
     raise HTTPException(status_code=400, detail=friendly_error(final_error(errors, "Instagram"), "Instagram"))
 
 

@@ -178,6 +178,45 @@ def ensure_h264(path: Path) -> Path:
         return path
 
 
+def cookie_source(env_b64: str, env_path: str) -> Optional[str]:
+    """
+    Çerezi ORTAMDAN al (repoya asla commit etme). Ya base64 (tek satır, panele yapıştırmak
+    kolay) ya da bir dosya yolu olabilir. Instagram gibi giriş isteyen platformlarda kullanılır.
+    """
+    import base64
+    import tempfile
+
+    b64 = os.getenv(env_b64)
+    if b64:
+        try:
+            fd, tmp = tempfile.mkstemp(suffix=".txt")
+            with os.fdopen(fd, "wb") as f:
+                f.write(base64.b64decode(b64))
+            return tmp
+        except Exception as e:
+            print("Çerez çözülemedi:", e)
+            return None
+    path = os.getenv(env_path)
+    if path and os.path.exists(path):
+        # yt-dlp cookie dosyasına geri yazabiliyor; salt-okunur bir secret file'da hata
+        # olmasın diye yazılabilir bir geçiciye kopyala
+        fd, tmp = tempfile.mkstemp(suffix=".txt")
+        os.close(fd)
+        shutil.copyfile(path, tmp)
+        return tmp
+    return None
+
+
+def cleanup_cookiefile(opts: dict) -> None:
+    import tempfile
+    ck = opts.get("cookiefile")
+    if ck and ck.startswith(tempfile.gettempdir()):
+        try:
+            os.unlink(ck)
+        except OSError:
+            pass
+
+
 def try_impersonate(opts: dict) -> dict:
     """curl_cffi kuruluysa TLS parmak izi kontrollerini geçmek için tarayıcı taklidi yap."""
     try:
@@ -218,6 +257,9 @@ def friendly_error(e: Exception, platform: str) -> str:
         return "Bağlantı zaman aşımına uğradı, tekrar deneyin."
     if "429" in low or "rate" in low and "limit" in low:
         return f"{platform} çok fazla istek nedeniyle geçici olarak sınırladı, biraz sonra tekrar deneyin."
+    if "login required" in low or "rate-limit reached or login" in low:
+        return (f"{platform} artık bu içerik için giriş yapılmış bir hesap istiyor. Sunucuya "
+                f"IG_COOKIES_B64 ortam değişkeni eklenmesi gerekiyor (yedek bir hesapla).")
     return f"{platform} hatası: {short_error(e)}"
 
 
