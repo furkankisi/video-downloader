@@ -3,6 +3,7 @@ import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
+import { Analytics } from '@vercel/analytics/react';
 
 export default function RootLayout() {
   // Google Analytics (GA4) Web Entegrasyonu
@@ -43,6 +44,7 @@ export default function RootLayout() {
       </Head>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#890d16' } }} />
+      {Platform.OS === 'web' && <Analytics />}
     </>
   );
 }
