@@ -11,11 +11,7 @@ export default function RootLayout() {
         <meta name="keywords" content="video indirici, youtube video indir, instagram downloader, tiktok video indir, x video indir, bitsaver pro" />
         
         {/* Google AdSense Kodu */}
-        <script 
-          async 
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8754966775877680" 
-          crossOrigin="anonymous"
-        ></script>
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8754966775877680" crossOrigin="anonymous"></script>
       </Head>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#890d16' } }} />
