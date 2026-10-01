@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity,
-  Animated, Easing, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image, ScrollView
+  Animated, Easing, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image, ScrollView, Modal
 } from 'react-native';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -46,6 +46,11 @@ export default function App() {
   const [isLoadingInfo, setIsLoadingInfo] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // Ödüllü Reklam / Bekleme Modalı State'leri
+  const [showRewardModal, setShowRewardModal] = useState(false);
+  const [rewardCountdown, setRewardCountdown] = useState(5);
+  const [rewardReady, setRewardReady] = useState(false);
+
   const [videoInfo, setVideoInfo] = useState<{ title: string; thumbnail: string } | null>(null);
   const [infoError, setInfoError] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -67,6 +72,31 @@ export default function App() {
     };
     startAnimation();
   }, []);
+
+  // AdSense reklamını tetiklemek için useEffect
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      try {
+        // @ts-ignore
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      } catch (e) {
+        console.log('Adsense yüklenirken hata:', e);
+      }
+    }
+  }, []);
+
+  // Ödül Geri Sayım Mantığı
+  useEffect(() => {
+    let timer: any;
+    if (showRewardModal && rewardCountdown > 0) {
+      timer = setTimeout(() => {
+        setRewardCountdown(prev => prev - 1);
+      }, 1000);
+    } else if (showRewardModal && rewardCountdown === 0) {
+      setRewardReady(true);
+    }
+    return () => clearTimeout(timer);
+  }, [showRewardModal, rewardCountdown]);
 
   const handleTabPress = (targetPlatform: Platform_) => {
     if (url.trim().length > 0) {
@@ -153,7 +183,16 @@ export default function App() {
     setIsLoadingInfo(false);
   };
 
-  const handleDownload = async () => {
+  // İndirme tetiklendiğinde ödül modalını aç
+  const triggerDownloadProcess = () => {
+    setRewardCountdown(5);
+    setRewardReady(false);
+    setShowRewardModal(true);
+  };
+
+  // Ödül tamamlandığında veya geçildiğinde gerçek indirmeyi başlat
+  const executeDownload = async () => {
+    setShowRewardModal(false);
     setIsDownloading(true);
     setDownloadError(null);
     setDownloadSuccess(false);
@@ -253,7 +292,7 @@ export default function App() {
           </View>
           <Text style={styles.subtitle}>[ RETRO BIT-DOWNLOAD SYSTEM v2.0 ]</Text>
 
-          {/* Platform Seçici (Pixel / Voxel Tarzı) */}
+          {/* Platform Seçici */}
           <View style={styles.platformSelector}>
             <TouchableOpacity
               style={[styles.platformBtn, activePlatform === 'instagram' && styles.activeInstagram]}
@@ -273,7 +312,7 @@ export default function App() {
               style={[styles.platformBtn, activePlatform === 'tiktok' && styles.activeTiktok]}
               onPress={() => handleTabPress('tiktok')}
             >
-              <FontAwesome5 name="tiktok" size={24} color={activePlatform === 'tiktok' ? '#FFF' : '#A78BFA'} />
+              <FontAwesome5 name="tiktok" size={24} color={activePlatform === 'tiktok' ? '#FFF' : '#25F4EE'} />
             </TouchableOpacity>
           </View>
 
@@ -353,7 +392,7 @@ export default function App() {
                 activePlatform === 'tiktok' && styles.btnTiktok,
                 isDownloading && { opacity: 0.7 }
               ]}
-              onPress={handleDownload}
+              onPress={triggerDownloadProcess}
               disabled={isDownloading}
             >
               {isDownloading ? (
@@ -384,8 +423,72 @@ export default function App() {
             </View>
           )}
 
+          {/* Google AdSense Reklam Alanı (ScrollView'un en altı) */}
+          {Platform.OS === 'web' && (
+            <View style={{ width: '100%', alignItems: 'center', marginTop: 30 }}>
+              {/* @ts-ignore */}
+              <ins
+                className="adsbygoogle"
+                style={{ display: 'block', width: '100%' }}
+                data-ad-client="ca-pub-8754966775877680"
+                data-ad-slot="4753170122"
+                data-ad-format="auto"
+                data-full-width-responsive="true"
+              />
+            </View>
+          )}
+
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* ÖDÜLLÜ REKLAM / BEKLEME MODALI */}
+      <Modal
+        visible={showRewardModal}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>[ ÖDÜLLÜ İNDİRME AKTİF ]</Text>
+            <Text style={styles.modalSubtitle}>
+              {rewardReady 
+                ? "Ödülünüz hazır! İndirmeyi başlatabilirsiniz." 
+                : `Reklam yükleniyor, lütfen ${rewardCountdown} saniye bekleyin...`}
+            </Text>
+
+            {/* Modal İçi Reklam Alanı */}
+            {Platform.OS === 'web' && (
+              <View style={styles.modalAdContainer}>
+                {/* @ts-ignore */}
+                <ins
+                  className="adsbygoogle"
+                  style={{ display: 'block', width: '280px', height: '150px' }}
+                  data-ad-client="ca-pub-8754966775877680"
+                  data-ad-slot="4753170122"
+                  data-ad-format="auto"
+                />
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.modalBtn, !rewardReady && { backgroundColor: '#4B5563' }]}
+              disabled={!rewardReady}
+              onPress={executeDownload}
+            >
+              <Text style={styles.modalBtnText}>
+                {rewardReady ? "VİDEOYU İNDİR [ÖDÜLÜ AL]" : `BEKLENİYOR (${rewardCountdown}s)`}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.modalCloseBtn}
+              onPress={() => setShowRewardModal(false)}
+            >
+              <Text style={styles.modalCloseText}>İptal Et</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Alt Voxel/Bit Animasyon Şeridi */}
       <View style={styles.bottomAnimationContainer} pointerEvents="none">
@@ -452,5 +555,16 @@ const styles = StyleSheet.create({
   btnInstagram: { backgroundColor: '#7C3AED', shadowColor: '#7C3AED' },
   btnX: { backgroundColor: '#1F1033', shadowColor: '#EC4899' },
   btnTiktok: { backgroundColor: '#DB2777', shadowColor: '#DB2777' },
-  downloadBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 1 }
+  downloadBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 1 },
+
+  // Modal Stilleri
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(10, 5, 24, 0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { width: '100%', maxWidth: 360, backgroundColor: '#170E33', borderRadius: 12, borderWidth: 2, borderColor: '#EC4899', padding: 24, alignItems: 'center', shadowColor: '#EC4899', shadowOffset: { width: 4, height: 4 }, shadowOpacity: 0.5, shadowRadius: 0, elevation: 10 },
+  modalTitle: { color: '#25F4EE', fontSize: 16, fontWeight: '900', marginBottom: 8, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', textAlign: 'center' },
+  modalSubtitle: { color: '#A78BFA', fontSize: 12, textAlign: 'center', marginBottom: 20 },
+  modalAdContainer: { width: '100%', height: 160, backgroundColor: '#110826', borderRadius: 8, borderWidth: 1, borderColor: '#4C1D95', justifyContent: 'center', alignItems: 'center', marginBottom: 20, overflow: 'hidden' },
+  modalBtn: { width: '100%', backgroundColor: '#10B981', paddingVertical: 14, borderRadius: 8, alignItems: 'center', borderWidth: 2, borderColor: '#34D399', marginBottom: 10 },
+  modalBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900', letterSpacing: 1 },
+  modalCloseBtn: { padding: 8 },
+  modalCloseText: { color: '#EF4444', fontSize: 12, fontWeight: '600' }
 });
