@@ -1,8 +1,36 @@
 import { Stack } from 'expo-router';
 import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { Platform } from 'react-native';
 
 export default function RootLayout() {
+  // Google Analytics (GA4) Web Entegrasyonu
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const measurementId = 'G-4MZS9TCEG5';
+
+      if (measurementId && !document.getElementById('ga-script')) {
+        // 1. Google Analytics ana script'i
+        const script1 = document.createElement('script');
+        script1.id = 'ga-script';
+        script1.async = true;
+        script1.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
+        document.head.appendChild(script1);
+
+        // 2. Yapılandırma script'i
+        const script2 = document.createElement('script');
+        script2.innerHTML = `
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', '${measurementId}');
+        `;
+        document.head.appendChild(script2);
+      }
+    }
+  }, []);
+
   return (
     <>
       <Head>
