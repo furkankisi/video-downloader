@@ -7,9 +7,12 @@ export default function RootLayout() {
     <>
       <Head>
         <title>BitSaver Pro - Instagram, TikTok ve X Video İndirici</title>
-        <meta name="description" content="Instagram, TikTok, X (Twitter) popüler platformlardan en yüksek kalitede video indirin. Hızlı, güvenli ve ücretsiz video downloader." />
+        <meta name="description" content="Instagram, TikTok, X (Twitter) ve diğer popüler platformlardan en yüksek kalitede video indirin. Hızlı, güvenli ve ücretsiz video downloader." />
         <meta name="keywords" content="video indirici, instagram downloader, tiktok video indir, x video indir, bitsaver pro" />
         
+        {/* Özel Favicon (Tarayıcı Sekme Logosu) */}
+        <link rel="icon" href="/pixel-logo.png" />
+
         {/* Google AdSense Kodu */}
         <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8754966775877680" crossOrigin="anonymous"></script>
 
