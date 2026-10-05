@@ -1,43 +1,42 @@
 {
   "expo": {
-    "name": "VideoApp",
-    "slug": "VideoApp",
+    "name": "BitSaver Pro",
+    "slug": "video-downloader",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./src/assets/images/icon.png",
-    "scheme": "videoapp",
-    "userInterfaceStyle": "automatic",
+    "icon": "./src/assets/images/pixel-logo.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./src/assets/images/pixel-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0518"
+    },
     "ios": {
-      "icon": "./src/assets/expo.icon"
+      "supportsTablet": true
     },
     "android": {
+      "package": "com.furkan.bitsaverpro",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./src/assets/images/android-icon-foreground.png",
-        "backgroundImage": "./src/assets/images/android-icon-background.png",
-        "monochromeImage": "./src/assets/images/android-icon-monochrome.png"
-      },
-      "predictiveBackGestureEnabled": false
+        "foregroundImage": "./src/assets/images/pixel-logo.png",
+        "backgroundColor": "#0A0518"
+      }
     },
     "web": {
+      "bundler": "metro",
       "output": "static",
-      "favicon": "./src/assets/images/favicon.png"
+      "favicon": "./src/assets/images/pixel-logo.png"
     },
     "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "backgroundColor": "#208AEF",
-          "image": "./src/assets/images/splash-icon.png",
-          "imageWidth": 76
-        }
-      ],
-      "expo-sharing"
+      "expo-router"
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "90572653-fbfc-4401-856e-79117466d4d9"
+      }
     }
   }
 }
