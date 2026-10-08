@@ -15,7 +15,7 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.furkan.bitsaverpro",
+      "package": "com.bitsaverpro",
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/images/pixel-logo.png",
         "backgroundColor": "#0A0518"
