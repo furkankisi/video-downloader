@@ -19,7 +19,13 @@
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/images/pixel-logo.png",
         "backgroundColor": "#0A0518"
-      }
+      },
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "com.android.vending.BILLING"
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -31,7 +37,8 @@
       [
         "react-native-google-mobile-ads",
         {
-          "androidAppId": "ca-app-pub-8754966775877680~5640199208"
+          "androidAppId": "ca-app-pub-8754966775877680~5640199208",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
         }
       ]
     ],
