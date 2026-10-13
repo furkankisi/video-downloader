@@ -281,17 +281,20 @@ export default function App() {
         <ScrollView contentContainerStyle={styles.scrollArea} showsVerticalScrollIndicator={false}>
           
           {/* MOBİL UYGULAMA İÇİN ADMOB BANNER REKLAMI */}
-          {Platform.OS !== 'web' && (
-            <View style={{ marginBottom: 20, alignItems: 'center', width: '100%' }}>
-              <BannerAd
-                unitId="ca-app-pub-8754966775877680/7883219165"
-                size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-                requestOptions={{
-                  requestNonPersonalizedAdsOnly: true,
-                }}
-              />
-            </View>
-          )}
+          {Platform.OS !== 'web' && (() => {
+            const { BannerAd, BannerAdSize } = require('react-native-google-mobile-ads');
+            return (
+              <View style={{ marginBottom: 20, alignItems: 'center', width: '100%' }}>
+                <BannerAd
+                  unitId="ca-app-pub-8754966775877680/7883219165"
+                  size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+                  requestOptions={{
+                    requestNonPersonalizedAdsOnly: true,
+                  }}
+                />
+              </View>
+            );
+          })()}
 
           {/* Voxel / Piksel Retro Logo ve Başlık */}
           <View style={styles.headerContainer}>
