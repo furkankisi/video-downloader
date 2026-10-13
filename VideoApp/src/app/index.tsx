@@ -7,7 +7,7 @@ import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-
+import AdBanner from '../components/AdBanner.native';
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || "https://video-downloader-cvtw.onrender.com").replace(/\/$/, "");
 const INFO_TIMEOUT_MS = 70000;
@@ -280,25 +280,8 @@ export default function App() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.content}>
         <ScrollView contentContainerStyle={styles.scrollArea} showsVerticalScrollIndicator={false}>
           
-          {/* MOBİL UYGULAMA İÇİN ADMOB BANNER REKLAMI */}
-          {Platform.OS !== 'web' && (() => {
-            try {
-              const { BannerAd, BannerAdSize } = require('react-native-google-mobile-ads');
-              return (
-                <View style={{ marginBottom: 20, alignItems: 'center', width: '100%' }}>
-                  <BannerAd
-                    unitId="ca-app-pub-8754966775877680/7883219165"
-                    size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-                    requestOptions={{
-                      requestNonPersonalizedAdsOnly: true,
-                    }}
-                  />
-                </View>
-              );
-            } catch (e) {
-              return null;
-            }
-          })()}
+          {/* AKILLI REKLAM BİLEŞENİ (Mobilde AdMob, Web'de AdSense çalışır) */}
+          <AdBanner />
 
           {/* Voxel / Piksel Retro Logo ve Başlık */}
           <View style={styles.headerContainer}>
@@ -442,21 +425,6 @@ export default function App() {
             </View>
           )}
 
-          {/* WEB SİTESİ İÇİN GOOGLE ADSENSE REKLAM ALANI */}
-          {Platform.OS === 'web' && (
-            <View style={{ width: '100%', alignItems: 'center', marginTop: 30 }}>
-              {/* @ts-ignore */}
-              <ins
-                className="adsbygoogle"
-                style={{ display: 'block', width: '100%' }}
-                data-ad-client="ca-pub-8754966775877680"
-                data-ad-slot="4753170122"
-                data-ad-format="auto"
-                data-full-width-responsive="true"
-              />
-            </View>
-          )}
-
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -475,7 +443,7 @@ export default function App() {
                 : `Reklam yükleniyor, lütfen ${rewardCountdown} saniye bekleyin...`}
             </Text>
 
-            {/* MODAL İÇİ WEB ADSENSE REKLAM ALANI */}
+            {/* Modal İçi Web AdSense Reklam Alanı */}
             {Platform.OS === 'web' && (
               <View style={styles.modalAdContainer}>
                 {/* @ts-ignore */}
@@ -517,7 +485,7 @@ export default function App() {
               <Image source={require('../assets/images/pixel-logo.png')} style={styles.movingIcon} resizeMode="contain" />
               <FontAwesome5 name="instagram" size={28} color="#A78BFA" style={{ marginHorizontal: 25 }} />
               <Text style={{ fontSize: 28, fontWeight: '900', color: '#EC4899', marginHorizontal: 25 }}>𝕏</Text>
-              <FontAwesome5 name="tiktok" size={28} color="#25F4EE" style={{ marginHorizontal: 25 }} />
+              <FontAwesome5 name="tiktok" size={25} color="#25F4EE" style={{ marginHorizontal: 25 }} />
             </View>
           ))}
         </Animated.View>
