@@ -2,19 +2,23 @@ import { Stack } from 'expo-router';
 import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import mobileAds from 'react-native-google-mobile-ads';
 import { Platform } from 'react-native';
 
 export default function RootLayout() {
   
-  // AdMob'u sadece mobil cihazlarda başlat
+  // AdMob'u sadece mobil cihazlarda güvenli bir şekilde başlat
   useEffect(() => {
     if (Platform.OS !== 'web') {
-      mobileAds()
-        .initialize()
-        .then((adapterStatuses: any) => {
-          console.log("AdMob Başarı ile Başlatıldı kanka!");
-        });
+      try {
+        const mobileAds = require('react-native-google-mobile-ads').default;
+        mobileAds()
+          .initialize()
+          .then(() => {
+            console.log("AdMob Başarı ile Başlatıldı kanka!");
+          });
+      } catch (e) {
+        console.log("AdMob başlatılamadı:", e);
+      }
     }
   }, []);
 
