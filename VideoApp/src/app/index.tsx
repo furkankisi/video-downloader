@@ -7,7 +7,7 @@ import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
+
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || "https://video-downloader-cvtw.onrender.com").replace(/\/$/, "");
 const INFO_TIMEOUT_MS = 70000;
@@ -282,18 +282,22 @@ export default function App() {
           
           {/* MOBİL UYGULAMA İÇİN ADMOB BANNER REKLAMI */}
           {Platform.OS !== 'web' && (() => {
-            const { BannerAd, BannerAdSize } = require('react-native-google-mobile-ads');
-            return (
-              <View style={{ marginBottom: 20, alignItems: 'center', width: '100%' }}>
-                <BannerAd
-                  unitId="ca-app-pub-8754966775877680/7883219165"
-                  size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-                  requestOptions={{
-                    requestNonPersonalizedAdsOnly: true,
-                  }}
-                />
-              </View>
-            );
+            try {
+              const { BannerAd, BannerAdSize } = require('react-native-google-mobile-ads');
+              return (
+                <View style={{ marginBottom: 20, alignItems: 'center', width: '100%' }}>
+                  <BannerAd
+                    unitId="ca-app-pub-8754966775877680/7883219165"
+                    size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+                    requestOptions={{
+                      requestNonPersonalizedAdsOnly: true,
+                    }}
+                  />
+                </View>
+              );
+            } catch (e) {
+              return null;
+            }
           })()}
 
           {/* Voxel / Piksel Retro Logo ve Başlık */}
