@@ -7,7 +7,7 @@ import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import AdBanner from '../components/AdBanner.native';
+
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || "https://video-downloader-cvtw.onrender.com").replace(/\/$/, "");
 const INFO_TIMEOUT_MS = 70000;
@@ -280,8 +280,39 @@ export default function App() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.content}>
         <ScrollView contentContainerStyle={styles.scrollArea} showsVerticalScrollIndicator={false}>
           
-          {/* AKILLI REKLAM BİLEŞENİ (Mobilde AdMob, Web'de AdSense çalışır) */}
-          <AdBanner />
+          {/* AKILLI REKLAM ALANI (Mobilde AdMob, Web'de AdSense) */}
+          {Platform.OS === 'web' ? (
+            <View style={{ width: '100%', alignItems: 'center', marginBottom: 20 }}>
+              {/* @ts-ignore */}
+              <ins
+                className="adsbygoogle"
+                style={{ display: 'block', width: '100%' }}
+                data-ad-client="ca-pub-8754966775877680"
+                data-ad-slot="4753170122"
+                data-ad-format="auto"
+                data-full-width-responsive="true"
+              />
+            </View>
+          ) : (
+            <View style={{ marginBottom: 20, alignItems: 'center', width: '100%' }}>
+              {(() => {
+                try {
+                  const { BannerAd, BannerAdSize } = require('react-native-google-mobile-ads');
+                  return (
+                    <BannerAd
+                      unitId="ca-app-pub-8754966775877680/7883219165"
+                      size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+                      requestOptions={{
+                        requestNonPersonalizedAdsOnly: true,
+                      }}
+                    />
+                  );
+                } catch (e) {
+                  return null;
+                }
+              })()}
+            </View>
+          )}
 
           {/* Voxel / Piksel Retro Logo ve Başlık */}
           <View style={styles.headerContainer}>
