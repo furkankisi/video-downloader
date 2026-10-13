@@ -7,6 +7,7 @@ import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || "https://video-downloader-cvtw.onrender.com").replace(/\/$/, "");
 const INFO_TIMEOUT_MS = 70000;
@@ -73,7 +74,7 @@ export default function App() {
     startAnimation();
   }, []);
 
-  // AdSense reklamını tetiklemek için useEffect
+  // Web tarayıcısında AdSense reklamlarını tetiklemek için
   useEffect(() => {
     if (Platform.OS === 'web') {
       try {
@@ -183,14 +184,12 @@ export default function App() {
     setIsLoadingInfo(false);
   };
 
-  // İndirme tetiklendiğinde ödül modalını aç
   const triggerDownloadProcess = () => {
     setRewardCountdown(5);
     setRewardReady(false);
     setShowRewardModal(true);
   };
 
-  // Ödül tamamlandığında veya geçildiğinde gerçek indirmeyi başlat
   const executeDownload = async () => {
     setShowRewardModal(false);
     setIsDownloading(true);
@@ -280,6 +279,19 @@ export default function App() {
     <View style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.content}>
         <ScrollView contentContainerStyle={styles.scrollArea} showsVerticalScrollIndicator={false}>
+          
+          {/* MOBİL UYGULAMA İÇİN ADMOB BANNER REKLAMI */}
+          {Platform.OS !== 'web' && (
+            <View style={{ marginBottom: 20, alignItems: 'center', width: '100%' }}>
+              <BannerAd
+                unitId="ca-app-pub-8754966775877680/7883219165"
+                size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+                requestOptions={{
+                  requestNonPersonalizedAdsOnly: true,
+                }}
+              />
+            </View>
+          )}
 
           {/* Voxel / Piksel Retro Logo ve Başlık */}
           <View style={styles.headerContainer}>
@@ -423,7 +435,7 @@ export default function App() {
             </View>
           )}
 
-          {/* Google AdSense Reklam Alanı (ScrollView'un en altı) */}
+          {/* WEB SİTESİ İÇİN GOOGLE ADSENSE REKLAM ALANI */}
           {Platform.OS === 'web' && (
             <View style={{ width: '100%', alignItems: 'center', marginTop: 30 }}>
               {/* @ts-ignore */}
@@ -456,7 +468,7 @@ export default function App() {
                 : `Reklam yükleniyor, lütfen ${rewardCountdown} saniye bekleyin...`}
             </Text>
 
-            {/* Modal İçi Reklam Alanı */}
+            {/* MODAL İÇİ WEB ADSENSE REKLAM ALANI */}
             {Platform.OS === 'web' && (
               <View style={styles.modalAdContainer}>
                 {/* @ts-ignore */}

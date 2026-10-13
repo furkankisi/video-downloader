@@ -1,8 +1,23 @@
 import { Stack } from 'expo-router';
 import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import mobileAds from 'react-native-google-mobile-ads';
+import { Platform } from 'react-native';
 
 export default function RootLayout() {
+  
+  // AdMob'u sadece mobil cihazlarda başlat
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      mobileAds()
+        .initialize()
+        .then((adapterStatuses: any) => {
+          console.log("AdMob Başarı ile Başlatıldı kanka!");
+        });
+    }
+  }, []);
+
   return (
     <>
       <Head>
