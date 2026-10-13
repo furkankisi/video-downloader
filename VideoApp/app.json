@@ -24,8 +24,7 @@
         "INTERNET",
         "ACCESS_NETWORK_STATE",
         "com.android.vending.BILLING"
-      ],
-      "googleServicesFile": "./google-services.json"
+      ]
     },
     "web": {
       "bundler": "metro",
