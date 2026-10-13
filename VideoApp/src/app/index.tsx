@@ -8,7 +8,6 @@ import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
-
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || "https://video-downloader-cvtw.onrender.com").replace(/\/$/, "");
 const INFO_TIMEOUT_MS = 70000;
 
@@ -52,6 +51,10 @@ export default function App() {
   const [rewardCountdown, setRewardCountdown] = useState(5);
   const [rewardReady, setRewardReady] = useState(false);
 
+  // Mobilde Ödüllü Reklam (Rewarded Ad) State'leri
+  const [rewardedLoaded, setRewardedLoaded] = useState(false);
+  const rewardedAdRef = useRef<any>(null);
+
   const [videoInfo, setVideoInfo] = useState<{ title: string; thumbnail: string } | null>(null);
   const [infoError, setInfoError] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -86,7 +89,46 @@ export default function App() {
     }
   }, []);
 
-  // Ödül Geri Sayım Mantığı
+  // Mobilde AdMob Ödüllü Reklamı Yükleme ve Dinleme Mantığı
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      try {
+        const { RewardedAd, RewardedAdEventType, TestIds } = require('react-native-google-mobile-ads');
+        
+        // Senin AdMob panelinden aldığın ödüllü reklam ID'si
+        const adUnitId = __DEV__ ? TestIds.REWARDED : 'ca-app-pub-8754966775877680/2878129487';
+
+        const rewarded = RewardedAd.createForAdRequest(adUnitId, {
+          requestNonPersonalizedAdsOnly: true,
+        });
+
+        rewardedAdRef.current = rewarded;
+
+        const unsubscribeLoaded = rewarded.addAdEventListener(RewardedAdEventType.LOADED, () => {
+          setRewardedLoaded(true);
+        });
+
+        const unsubscribeEarned = rewarded.addAdEventListener(
+          RewardedAdEventType.EARNED_REWARD,
+          (reward: any) => {
+            console.log('Kullanıcı ödülü kazandı:', reward);
+            executeDownload(); // Reklam izlenince indirmeyi başlatır
+          },
+        );
+
+        rewarded.load();
+
+        return () => {
+          unsubscribeLoaded();
+          unsubscribeEarned();
+        };
+      } catch (e) {
+        console.log('Rewarded ad yüklenirken hata:', e);
+      }
+    }
+  }, []);
+
+  // Ödül Geri Sayım Mantığı (Web için)
   useEffect(() => {
     let timer: any;
     if (showRewardModal && rewardCountdown > 0) {
@@ -185,6 +227,17 @@ export default function App() {
   };
 
   const triggerDownloadProcess = () => {
+    // Mobilde yüklendiyse ödüllü reklamı göster
+    if (Platform.OS !== 'web' && rewardedAdRef.current && rewardedLoaded) {
+      try {
+        rewardedAdRef.current.show();
+        return;
+      } catch (e) {
+        console.log('Reklam gösterilemedi, modal akışına geçiliyor:', e);
+      }
+    }
+
+    // Web veya reklam hazır değilse web modalını aç
     setRewardCountdown(5);
     setRewardReady(false);
     setShowRewardModal(true);
@@ -280,7 +333,7 @@ export default function App() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.content}>
         <ScrollView contentContainerStyle={styles.scrollArea} showsVerticalScrollIndicator={false}>
           
-          {/* AKILLI REKLAM ALANI (Mobilde AdMob, Web'de AdSense) */}
+          {/* AKILLI REKLAM ALANI (Mobilde AdMob Banner, Web'de AdSense) */}
           {Platform.OS === 'web' ? (
             <View style={{ width: '100%', alignItems: 'center', marginBottom: 20 }}>
               {/* @ts-ignore */}
@@ -459,7 +512,7 @@ export default function App() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* ÖDÜLLÜ REKLAM / BEKLEME MODALI */}
+      {/* WEB İÇİN ÖDÜLLÜ REKLAM / BEKLEME MODALI */}
       <Modal
         visible={showRewardModal}
         transparent={true}
