@@ -12,7 +12,12 @@
       "backgroundColor": "#0A0518"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bitsaverpro",
+      "infoPlist": {
+        "NSPhotoLibraryAddUsageDescription": "İndirdiğiniz videoları galerinize kaydetmek için gerekli.",
+        "NSPhotoLibraryUsageDescription": "İndirdiğiniz videoları galerinize kaydetmek için gerekli."
+      }
     },
     "android": {
       "package": "com.bitsaverpro",
@@ -34,6 +39,14 @@
     "plugins": [
       "expo-router",
       [
+        "expo-media-library",
+        {
+          "photosPermission": "İndirdiğiniz videoları galerinize kaydetmek için gerekli.",
+          "savePhotosPermission": "İndirdiğiniz videoları galerinize kaydetmek için gerekli.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
         "react-native-google-mobile-ads",
         {
           "androidAppId": "ca-app-pub-8754966775877680~5640199208",
@@ -49,6 +62,7 @@
       "eas": {
         "projectId": "90572653-fbfc-4401-856e-79117466d4d9"
       }
-    }
+    },
+    "scheme": "bitsaverpro"
   }
 }

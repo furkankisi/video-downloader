@@ -7,6 +7,7 @@ import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || "https://video-downloader-cvtw.onrender.com").replace(/\/$/, "");
 const INFO_TIMEOUT_MS = 70000;
@@ -54,11 +55,15 @@ export default function App() {
   // Mobilde Ödüllü Reklam (Rewarded Ad) State'leri
   const [rewardedLoaded, setRewardedLoaded] = useState(false);
   const rewardedAdRef = useRef<any>(null);
+  // Reklam dinleyicisi mount anında kuruluyor; o anki (url='') state'i yakalamasın diye
+  // her render'da güncellenen ref üzerinden en güncel executeDownload'u çağırıyoruz.
+  const executeDownloadRef = useRef<() => void>(() => {});
 
   const [videoInfo, setVideoInfo] = useState<{ title: string; thumbnail: string } | null>(null);
   const [infoError, setInfoError] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [savedToGallery, setSavedToGallery] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
 
@@ -93,7 +98,7 @@ export default function App() {
   useEffect(() => {
     if (Platform.OS !== 'web') {
       try {
-        const { RewardedAd, RewardedAdEventType, TestIds } = require('react-native-google-mobile-ads');
+        const { RewardedAd, RewardedAdEventType, AdEventType, TestIds } = require('react-native-google-mobile-ads');
         
         // Senin AdMob panelinden aldığın ödüllü reklam ID'si
         const adUnitId = __DEV__ ? TestIds.REWARDED : 'ca-app-pub-8754966775877680/2878129487';
@@ -112,15 +117,28 @@ export default function App() {
           RewardedAdEventType.EARNED_REWARD,
           (reward: any) => {
             console.log('Kullanıcı ödülü kazandı:', reward);
-            executeDownload(); // Reklam izlenince indirmeyi başlatır
+            executeDownloadRef.current(); // Reklam izlenince indirmeyi başlatır
           },
         );
+
+        // Reklam kapanınca bir sonrakini yükle (yoksa ikinci indirmede reklam hiç gelmez)
+        const unsubscribeClosed = rewarded.addAdEventListener(AdEventType.CLOSED, () => {
+          setRewardedLoaded(false);
+          rewarded.load();
+        });
+
+        const unsubscribeError = rewarded.addAdEventListener(AdEventType.ERROR, (err: any) => {
+          console.log('Rewarded ad hatası:', err);
+          setRewardedLoaded(false);
+        });
 
         rewarded.load();
 
         return () => {
           unsubscribeLoaded();
           unsubscribeEarned();
+          unsubscribeClosed();
+          unsubscribeError();
         };
       } catch (e) {
         console.log('Rewarded ad yüklenirken hata:', e);
@@ -248,6 +266,7 @@ export default function App() {
     setIsDownloading(true);
     setDownloadError(null);
     setDownloadSuccess(false);
+    setSavedToGallery(false);
 
     try {
       const link = extractUrl(url);
@@ -311,10 +330,23 @@ export default function App() {
         throw new Error(msg);
       }
 
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(result.uri, { mimeType: 'video/mp4', UTI: 'public.mpeg-4' });
-      } else {
-        Alert.alert("Başarılı", "Video indirildi: " + result.uri);
+      // Videoyu otomatik olarak galeriye kaydet
+      try {
+        // writeOnly=true: Android 13+ ve iOS'ta sadece "ekleme" izni ister (tüm medyaya erişim gerekmez)
+        const perm = await MediaLibrary.requestPermissionsAsync(true);
+        if (!perm.granted) {
+          throw new Error('Galeri izni verilmedi. Ayarlar > BitSaver Pro > İzinler bölümünden izin verin.');
+        }
+        await MediaLibrary.saveToLibraryAsync(result.uri);
+        setSavedToGallery(true);
+        await FileSystem.deleteAsync(result.uri, { idempotent: true }); // cache'i şişirme
+      } catch (saveErr: any) {
+        console.log('Galeriye kaydedilemedi:', saveErr);
+        // Kaydedilemezse kullanıcı videoyu kaybetmesin: paylaşım menüsünü aç
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(result.uri, { mimeType: 'video/mp4', UTI: 'public.mpeg-4' });
+        }
+        throw new Error(saveErr?.message || 'Video galeriye kaydedilemedi.');
       }
       setDownloadSuccess(true);
     } catch (err: unknown) {
@@ -325,6 +357,8 @@ export default function App() {
       setIsDownloading(false);
     }
   };
+
+  executeDownloadRef.current = executeDownload;
 
   const platformLabel = PLATFORM_LABELS[activePlatform];
 
@@ -505,7 +539,9 @@ export default function App() {
           {downloadSuccess && !isDownloading && !downloadError && (
             <View style={[styles.successCard, { marginTop: 16 }]}>
               <Ionicons name="checkmark-circle" size={20} color="#10B981" style={{ marginRight: 8 }} />
-              <Text style={styles.successText}>[ BAŞARILI ] Video indirildi.</Text>
+              <Text style={styles.successText}>
+                {savedToGallery ? '[ BAŞARILI ] Video galeriye kaydedildi.' : '[ BAŞARILI ] Video indirildi.'}
+              </Text>
             </View>
           )}
 
