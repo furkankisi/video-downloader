@@ -6,8 +6,9 @@ import {
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
+// REVENUECAT EKLENDİ
+import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || "https://video-downloader-cvtw.onrender.com").replace(/\/$/, "");
 const INFO_TIMEOUT_MS = 70000;
@@ -47,27 +48,97 @@ export default function App() {
   const [isLoadingInfo, setIsLoadingInfo] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // Ödüllü Reklam / Bekleme Modalı State'leri
+  // ABONELİK DURUMLARI (REVENUECAT)
+  const [isAdFree, setIsAdFree] = useState(false);
+  const [currentOffering, setCurrentOffering] = useState<any>(null);
+
   const [showRewardModal, setShowRewardModal] = useState(false);
   const [rewardCountdown, setRewardCountdown] = useState(5);
   const [rewardReady, setRewardReady] = useState(false);
 
-  // Mobilde Ödüllü Reklam (Rewarded Ad) State'leri
   const [rewardedLoaded, setRewardedLoaded] = useState(false);
   const rewardedAdRef = useRef<any>(null);
-  // Reklam dinleyicisi mount anında kuruluyor; o anki (url='') state'i yakalamasın diye
-  // her render'da güncellenen ref üzerinden en güncel executeDownload'u çağırıyoruz.
-  const executeDownloadRef = useRef<() => void>(() => {});
 
   const [videoInfo, setVideoInfo] = useState<{ title: string; thumbnail: string } | null>(null);
   const [infoError, setInfoError] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
-  const [savedToGallery, setSavedToGallery] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
 
   const scrollX = useRef(new Animated.Value(0)).current;
+
+  // REVENUECAT BAŞLATMA
+  useEffect(() => {
+    setupRevenueCat();
+  }, []);
+
+  const setupRevenueCat = async () => {
+    try {
+      if (Platform.OS === 'web') return; // Web'de RevenueCat çalışmaz
+
+      Purchases.setLogLevel(LOG_LEVEL.DEBUG);
+      
+      // DİKKAT: BURAYA KENDİ REVENUECAT API KEYLERİNİ GİRECEKSİN!
+      if (Platform.OS === 'android') {
+        Purchases.configure({ apiKey: "test_pXiDHTDUcMaHQtpATQGhrMrIwAr" }); 
+      } else if (Platform.OS === 'ios') {
+        Purchases.configure({ apiKey: "test_pXiDHTDUcMaHQtpATQGhrMrIwAr" });
+      }
+
+      // Aktif aboneliği kontrol et
+      const customerInfo = await Purchases.getCustomerInfo();
+      // 'pro_access', RevenueCat panelinde oluşturduğumuz Entitlement ID olacak
+      if (typeof customerInfo.entitlements.active.pro_access !== "undefined") {
+        setIsAdFree(true);
+      }
+
+      // Paketleri getir
+      const offerings = await Purchases.getOfferings();
+      if (offerings.current !== null) {
+        setCurrentOffering(offerings.current);
+      }
+    } catch (e) {
+      console.log("RevenueCat hatası:", e);
+    }
+  };
+
+  // ABONE OLMA FONKSİYONU
+  const buyAdFreeVersion = async () => {
+    if (!currentOffering) {
+      Alert.alert("Paketler Yükleniyor", "Lütfen birkaç saniye bekleyip tekrar deneyin.");
+      return;
+    }
+
+    try {
+      // Aylık paketi satın al (3 Gün Bedava olacak şekilde Play Console'da ayarlı)
+      const { customerInfo } = await Purchases.purchasePackage(currentOffering.monthly);
+      
+      if (typeof customerInfo.entitlements.active.pro_access !== "undefined") {
+        setIsAdFree(true);
+        Alert.alert("Aramıza Hoş Geldin!", "İlk 3 gün tamamen ücretsiz. Reklamsız deneyimin tadını çıkar!");
+      }
+    } catch (e: any) {
+      if (!e.userCancelled) {
+        Alert.alert("Hata", "Abonelik işlemi tamamlanamadı.");
+      }
+    }
+  };
+
+  // SATIN ALIMLARI GERİ YÜKLE (Kullanıcı uygulamayı silip yüklerse vs.)
+  const restorePurchases = async () => {
+    try {
+      const customerInfo = await Purchases.restorePurchases();
+      if (typeof customerInfo.entitlements.active.pro_access !== "undefined") {
+        setIsAdFree(true);
+        Alert.alert("Başarılı", "Aboneliğiniz başarıyla geri yüklendi!");
+      } else {
+        Alert.alert("Bilgi", "Aktif bir aboneliğiniz bulunamadı.");
+      }
+    } catch (e) {
+      Alert.alert("Hata", "Geri yükleme işlemi başarısız oldu.");
+    }
+  };
 
   useEffect(() => {
     const startAnimation = () => {
@@ -82,25 +153,19 @@ export default function App() {
     startAnimation();
   }, []);
 
-  // Web tarayıcısında AdSense reklamlarını tetiklemek için
   useEffect(() => {
-    if (Platform.OS === 'web') {
+    if (Platform.OS === 'web' && !isAdFree) {
       try {
         // @ts-ignore
         (window.adsbygoogle = window.adsbygoogle || []).push({});
-      } catch (e) {
-        console.log('Adsense yüklenirken hata:', e);
-      }
+      } catch (e) {}
     }
-  }, []);
+  }, [isAdFree]);
 
-  // Mobilde AdMob Ödüllü Reklamı Yükleme ve Dinleme Mantığı
   useEffect(() => {
-    if (Platform.OS !== 'web') {
+    if (Platform.OS !== 'web' && !isAdFree) {
       try {
-        const { RewardedAd, RewardedAdEventType, AdEventType, TestIds } = require('react-native-google-mobile-ads');
-        
-        // Senin AdMob panelinden aldığın ödüllü reklam ID'si
+        const { RewardedAd, RewardedAdEventType, TestIds } = require('react-native-google-mobile-ads');
         const adUnitId = __DEV__ ? TestIds.REWARDED : 'ca-app-pub-8754966775877680/2878129487';
 
         const rewarded = RewardedAd.createForAdRequest(adUnitId, {
@@ -108,51 +173,22 @@ export default function App() {
         });
 
         rewardedAdRef.current = rewarded;
-
-        const unsubscribeLoaded = rewarded.addAdEventListener(RewardedAdEventType.LOADED, () => {
-          setRewardedLoaded(true);
-        });
-
-        const unsubscribeEarned = rewarded.addAdEventListener(
-          RewardedAdEventType.EARNED_REWARD,
-          (reward: any) => {
-            console.log('Kullanıcı ödülü kazandı:', reward);
-            executeDownloadRef.current(); // Reklam izlenince indirmeyi başlatır
-          },
-        );
-
-        // Reklam kapanınca bir sonrakini yükle (yoksa ikinci indirmede reklam hiç gelmez)
-        const unsubscribeClosed = rewarded.addAdEventListener(AdEventType.CLOSED, () => {
-          setRewardedLoaded(false);
-          rewarded.load();
-        });
-
-        const unsubscribeError = rewarded.addAdEventListener(AdEventType.ERROR, (err: any) => {
-          console.log('Rewarded ad hatası:', err);
-          setRewardedLoaded(false);
-        });
-
+        const unsubscribeLoaded = rewarded.addAdEventListener(RewardedAdEventType.LOADED, () => setRewardedLoaded(true));
+        const unsubscribeEarned = rewarded.addAdEventListener(RewardedAdEventType.EARNED_REWARD, () => executeDownload());
         rewarded.load();
 
         return () => {
           unsubscribeLoaded();
           unsubscribeEarned();
-          unsubscribeClosed();
-          unsubscribeError();
         };
-      } catch (e) {
-        console.log('Rewarded ad yüklenirken hata:', e);
-      }
+      } catch (e) {}
     }
-  }, []);
+  }, [isAdFree]);
 
-  // Ödül Geri Sayım Mantığı (Web için)
   useEffect(() => {
     let timer: any;
     if (showRewardModal && rewardCountdown > 0) {
-      timer = setTimeout(() => {
-        setRewardCountdown(prev => prev - 1);
-      }, 1000);
+      timer = setTimeout(() => setRewardCountdown(prev => prev - 1), 1000);
     } else if (showRewardModal && rewardCountdown === 0) {
       setRewardReady(true);
     }
@@ -163,10 +199,7 @@ export default function App() {
     if (url.trim().length > 0) {
       const linkPlatform = detectPlatform(url, activePlatform);
       if (targetPlatform !== linkPlatform) {
-        Alert.alert(
-          "İşlem Engellendi",
-          `Yapıştırdığınız link bir ${PLATFORM_LABELS[linkPlatform]} linkidir. Lütfen önce linki temizleyin!`
-        );
+        Alert.alert("İşlem Engellendi", `Bu link bir ${PLATFORM_LABELS[linkPlatform]} linkidir.`);
         return;
       }
     }
@@ -193,9 +226,7 @@ export default function App() {
       }
     } catch (e: any) {
       if (reqId !== requestIdRef.current) return;
-      setInfoError(e?.name === 'AbortError'
-        ? 'Sunucu yanıt vermedi (uyanıyor olabilir), birkaç saniye sonra tekrar deneyin.'
-        : 'Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin.');
+      setInfoError('Sunucuya ulaşılamadı.');
     } finally {
       clearTimeout(timer);
       if (reqId === requestIdRef.current) setIsLoadingInfo(false);
@@ -226,11 +257,7 @@ export default function App() {
 
   const handlePaste = async () => {
     const text = await Clipboard.getStringAsync();
-    if (text) {
-      handleUrlChange(text);
-    } else {
-      Alert.alert("Panoda Bir Şey Yok", "Önce linki kopyalamanız gerekiyor.");
-    }
+    if (text) handleUrlChange(text);
   };
 
   const handleClear = () => {
@@ -245,17 +272,16 @@ export default function App() {
   };
 
   const triggerDownloadProcess = () => {
-    // Mobilde yüklendiyse ödüllü reklamı göster
+    if (isAdFree) {
+      executeDownload();
+      return;
+    }
     if (Platform.OS !== 'web' && rewardedAdRef.current && rewardedLoaded) {
       try {
         rewardedAdRef.current.show();
         return;
-      } catch (e) {
-        console.log('Reklam gösterilemedi, modal akışına geçiliyor:', e);
-      }
+      } catch (e) {}
     }
-
-    // Web veya reklam hazır değilse web modalını aç
     setRewardCountdown(5);
     setRewardReady(false);
     setShowRewardModal(true);
@@ -266,7 +292,6 @@ export default function App() {
     setIsDownloading(true);
     setDownloadError(null);
     setDownloadSuccess(false);
-    setSavedToGallery(false);
 
     try {
       const link = extractUrl(url);
@@ -279,25 +304,8 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: link }),
         });
-        if (!res.ok) {
-          throw new Error(await readError(res, "İndirme başarısız oldu."));
-        }
+        if (!res.ok) throw new Error("İndirme başarısız.");
         const blob = await res.blob();
-
-        const nav: any = typeof navigator !== 'undefined' ? navigator : null;
-        if (nav?.share && nav?.canShare) {
-          try {
-            const file = new File([blob], filename, { type: 'video/mp4' });
-            if (nav.canShare({ files: [file] })) {
-              await nav.share({ files: [file], title: filename });
-              setDownloadSuccess(true);
-              return;
-            }
-          } catch (shareErr) {
-            console.log('navigator.share kullanılamadı:', shareErr);
-          }
-        }
-
         const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = downloadUrl;
@@ -310,55 +318,32 @@ export default function App() {
         return;
       }
 
-      const endpoint = `${API_BASE}/download-${platform}?url=${encodeURIComponent(link)}`;
-      const dir = FileSystem.cacheDirectory || FileSystem.documentDirectory || 'file:///var/mobile/';
-      const fileUri = `${dir}${filename}`;
+      // GALERİYE KAYDETME (MediaLibrary)
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        throw new Error("Galeriye kaydetmek için izin vermelisiniz.");
+      }
 
+      const endpoint = `${API_BASE}/download-${platform}?url=${encodeURIComponent(link)}`;
+      const fileUri = `${FileSystem.documentDirectory}${filename}`;
       const downloadResumable = FileSystem.createDownloadResumable(endpoint, fileUri);
       const result = await downloadResumable.downloadAsync();
 
-      if (!result) throw new Error("İndirme iptal edildi.");
+      if (!result || result.status !== 200) throw new Error("Video indirilemedi.");
 
-      if (result.status !== 200) {
-        let msg = "Video indirilemedi.";
-        try {
-          const body = await FileSystem.readAsStringAsync(result.uri);
-          const j = JSON.parse(body);
-          if (typeof j?.detail === 'string') msg = j.detail;
-        } catch {}
-        await FileSystem.deleteAsync(result.uri, { idempotent: true });
-        throw new Error(msg);
-      }
+      const asset = await MediaLibrary.createAssetAsync(result.uri);
+      await MediaLibrary.createAlbumAsync("BitSaverPro", asset, false);
 
-      // Videoyu otomatik olarak galeriye kaydet
-      try {
-        // writeOnly=true: Android 13+ ve iOS'ta sadece "ekleme" izni ister (tüm medyaya erişim gerekmez)
-        const perm = await MediaLibrary.requestPermissionsAsync(true);
-        if (!perm.granted) {
-          throw new Error('Galeri izni verilmedi. Ayarlar > BitSaver Pro > İzinler bölümünden izin verin.');
-        }
-        await MediaLibrary.saveToLibraryAsync(result.uri);
-        setSavedToGallery(true);
-        await FileSystem.deleteAsync(result.uri, { idempotent: true }); // cache'i şişirme
-      } catch (saveErr: any) {
-        console.log('Galeriye kaydedilemedi:', saveErr);
-        // Kaydedilemezse kullanıcı videoyu kaybetmesin: paylaşım menüsünü aç
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(result.uri, { mimeType: 'video/mp4', UTI: 'public.mpeg-4' });
-        }
-        throw new Error(saveErr?.message || 'Video galeriye kaydedilemedi.');
-      }
+      Alert.alert("Başarılı", "Video başarıyla galeriye kaydedildi! 📱");
       setDownloadSuccess(true);
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "İndirme başarısız oldu.";
+      const errorMessage = err instanceof Error ? err.message : "İndirme başarısız.";
       setDownloadError(errorMessage);
-      if (Platform.OS !== 'web') Alert.alert("İndirilemedi", errorMessage);
+      if (Platform.OS !== 'web') Alert.alert("Hata", errorMessage);
     } finally {
       setIsDownloading(false);
     }
   };
-
-  executeDownloadRef.current = executeDownload;
 
   const platformLabel = PLATFORM_LABELS[activePlatform];
 
@@ -367,76 +352,71 @@ export default function App() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.content}>
         <ScrollView contentContainerStyle={styles.scrollArea} showsVerticalScrollIndicator={false}>
           
-          {/* AKILLI REKLAM ALANI (Mobilde AdMob Banner, Web'de AdSense) */}
-          {Platform.OS === 'web' ? (
-            <View style={{ width: '100%', alignItems: 'center', marginBottom: 20 }}>
-              {/* @ts-ignore */}
-              <ins
-                className="adsbygoogle"
-                style={{ display: 'block', width: '100%' }}
-                data-ad-client="ca-pub-8754966775877680"
-                data-ad-slot="4753170122"
-                data-ad-format="auto"
-                data-full-width-responsive="true"
-              />
-            </View>
-          ) : (
-            <View style={{ marginBottom: 20, alignItems: 'center', width: '100%' }}>
-              {(() => {
-                try {
-                  const { BannerAd, BannerAdSize } = require('react-native-google-mobile-ads');
-                  return (
-                    <BannerAd
-                      unitId="ca-app-pub-8754966775877680/7883219165"
-                      size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-                      requestOptions={{
-                        requestNonPersonalizedAdsOnly: true,
-                      }}
-                    />
-                  );
-                } catch (e) {
-                  return null;
-                }
-              })()}
-            </View>
+          {/* REKLAM ALANLARI */}
+          {!isAdFree && (
+            Platform.OS === 'web' ? (
+              <View style={{ width: '100%', alignItems: 'center', marginBottom: 20 }}>
+                {/* @ts-ignore */}
+                <ins
+                  className="adsbygoogle"
+                  style={{ display: 'block', width: '100%' }}
+                  data-ad-client="ca-pub-8754966775877680"
+                  data-ad-slot="4753170122"
+                  data-ad-format="auto"
+                  data-full-width-responsive="true"
+                />
+              </View>
+            ) : (
+              <View style={{ marginBottom: 20, alignItems: 'center', width: '100%' }}>
+                {(() => {
+                  try {
+                    const { BannerAd, BannerAdSize } = require('react-native-google-mobile-ads');
+                    return (
+                      <BannerAd
+                        unitId="ca-app-pub-8754966775877680/7883219165"
+                        size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+                        requestOptions={{ requestNonPersonalizedAdsOnly: true }}
+                      />
+                    );
+                  } catch (e) {
+                    return null;
+                  }
+                })()}
+              </View>
+            )
           )}
 
-          {/* Voxel / Piksel Retro Logo ve Başlık */}
           <View style={styles.headerContainer}>
-            <Image 
-              source={require('../assets/images/pixel-logo.png')}
-              style={styles.logoImage} 
-              resizeMode="contain" 
-            />
+            <Image source={require('../assets/images/pixel-logo.png')} style={styles.logoImage} resizeMode="contain" />
             <Text style={styles.title}>BitSaver <Text style={styles.proBadge}>PRO</Text></Text>
           </View>
           <Text style={styles.subtitle}>[ RETRO BIT-DOWNLOAD SYSTEM v2.0 ]</Text>
 
-          {/* Platform Seçici */}
+          {/* ABONELİK (PRO) ALANI */}
+          {!isAdFree && (
+            <View style={{ alignItems: 'center', marginBottom: 24, width: '100%' }}>
+              <TouchableOpacity style={styles.proUpgradeBtn} onPress={buyAdFreeVersion}>
+                <Ionicons name="star" size={16} color="#FBBF24" style={{ marginRight: 6 }} />
+                <Text style={styles.proUpgradeText}>REKLAMLARI KALDIR [ İLK 3 GÜN ÜCRETSİZ ]</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={restorePurchases}>
+                <Text style={styles.restoreText}>Satın Alımları Geri Yükle</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           <View style={styles.platformSelector}>
-            <TouchableOpacity
-              style={[styles.platformBtn, activePlatform === 'instagram' && styles.activeInstagram]}
-              onPress={() => handleTabPress('instagram')}
-            >
+            <TouchableOpacity style={[styles.platformBtn, activePlatform === 'instagram' && styles.activeInstagram]} onPress={() => handleTabPress('instagram')}>
               <FontAwesome5 name="instagram" size={24} color={activePlatform === 'instagram' ? '#FFF' : '#A78BFA'} />
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.platformBtn, activePlatform === 'x' && styles.activeX]}
-              onPress={() => handleTabPress('x')}
-            >
+            <TouchableOpacity style={[styles.platformBtn, activePlatform === 'x' && styles.activeX]} onPress={() => handleTabPress('x')}>
               <Text style={[styles.xLogoText, { color: activePlatform === 'x' ? '#FFF' : '#A78BFA' }]}>𝕏</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.platformBtn, activePlatform === 'tiktok' && styles.activeTiktok]}
-              onPress={() => handleTabPress('tiktok')}
-            >
+            <TouchableOpacity style={[styles.platformBtn, activePlatform === 'tiktok' && styles.activeTiktok]} onPress={() => handleTabPress('tiktok')}>
               <FontAwesome5 name="tiktok" size={24} color={activePlatform === 'tiktok' ? '#FFF' : '#25F4EE'} />
             </TouchableOpacity>
           </View>
 
-          {/* Input ve Temizle / Yapıştır Butonları */}
           <View style={styles.inputWrapper}>
             {url.length > 0 && (
               <TouchableOpacity style={styles.clearBtn} onPress={handleClear}>
@@ -458,12 +438,6 @@ export default function App() {
             </TouchableOpacity>
           </View>
 
-          {url.length === 0 && (
-            <Text style={styles.hintText}>
-              &gt; Herkese açık video ve gönderi linklerini yapıştırabilirsiniz.
-            </Text>
-          )}
-
           {isLoadingInfo && (
             <View style={styles.loadingInfoContainer}>
               <ActivityIndicator color="#EC4899" size="small" />
@@ -478,18 +452,13 @@ export default function App() {
             </View>
           )}
 
-          {/* Önizleme Kartı */}
           {url.length > 5 && !isLoadingInfo && !infoError && (
             <View style={styles.previewCard}>
               {videoInfo?.thumbnail ? (
                 <Image source={{ uri: videoInfo.thumbnail }} style={styles.thumbnail} resizeMode="cover" />
               ) : (
                 <View style={styles.fallbackThumbnail}>
-                  {activePlatform === 'x' ? (
-                    <Text style={[styles.xLogoText, { color: '#EC4899', fontSize: 32 }]}>𝕏</Text>
-                  ) : (
-                    <FontAwesome5 name={activePlatform} size={36} color="#EC4899" />
-                  )}
+                  <FontAwesome5 name={activePlatform} size={36} color="#EC4899" />
                   <Text style={styles.fallbackText}>[ {platformLabel} DATA ]</Text>
                 </View>
               )}
@@ -502,7 +471,6 @@ export default function App() {
             </View>
           )}
 
-          {/* İndir Butonu */}
           {url.length > 5 && (
             <TouchableOpacity
               style={[
@@ -528,150 +496,69 @@ export default function App() {
               )}
             </TouchableOpacity>
           )}
-
-          {downloadError && !isDownloading && (
-            <View style={[styles.errorCard, { marginTop: 16 }]}>
-              <Ionicons name="alert-circle" size={20} color="#EF4444" style={{ marginRight: 8 }} />
-              <Text style={styles.errorText}>{downloadError}</Text>
-            </View>
-          )}
-
-          {downloadSuccess && !isDownloading && !downloadError && (
-            <View style={[styles.successCard, { marginTop: 16 }]}>
-              <Ionicons name="checkmark-circle" size={20} color="#10B981" style={{ marginRight: 8 }} />
-              <Text style={styles.successText}>
-                {savedToGallery ? '[ BAŞARILI ] Video galeriye kaydedildi.' : '[ BAŞARILI ] Video indirildi.'}
-              </Text>
-            </View>
-          )}
-
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* WEB İÇİN ÖDÜLLÜ REKLAM / BEKLEME MODALI */}
-      <Modal
-        visible={showRewardModal}
-        transparent={true}
-        animationType="fade"
-      >
+      <Modal visible={showRewardModal} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>[ ÖDÜLLÜ İNDİRME AKTİF ]</Text>
             <Text style={styles.modalSubtitle}>
-              {rewardReady 
-                ? "Ödülünüz hazır! İndirmeyi başlatabilirsiniz." 
-                : `Reklam yükleniyor, lütfen ${rewardCountdown} saniye bekleyin...`}
+              {rewardReady ? "Ödülünüz hazır!" : `Reklam yükleniyor, lütfen ${rewardCountdown} saniye bekleyin...`}
             </Text>
-
-            {/* Modal İçi Web AdSense Reklam Alanı */}
-            {Platform.OS === 'web' && (
-              <View style={styles.modalAdContainer}>
-                {/* @ts-ignore */}
-                <ins
-                  className="adsbygoogle"
-                  style={{ display: 'block', width: '280px', height: '150px' }}
-                  data-ad-client="ca-pub-8754966775877680"
-                  data-ad-slot="4753170122"
-                  data-ad-format="auto"
-                />
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={[styles.modalBtn, !rewardReady && { backgroundColor: '#4B5563' }]}
-              disabled={!rewardReady}
-              onPress={executeDownload}
-            >
-              <Text style={styles.modalBtnText}>
-                {rewardReady ? "VİDEOYU İNDİR [ÖDÜLÜ AL]" : `BEKLENİYOR (${rewardCountdown}s)`}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.modalCloseBtn}
-              onPress={() => setShowRewardModal(false)}
-            >
-              <Text style={styles.modalCloseText}>İptal Et</Text>
+            <TouchableOpacity style={[styles.modalBtn, !rewardReady && { backgroundColor: '#4B5563' }]} disabled={!rewardReady} onPress={executeDownload}>
+              <Text style={styles.modalBtnText}>{rewardReady ? "İNDİR" : `BEKLENİYOR (${rewardCountdown}s)`}</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-
-      {/* Alt Voxel/Bit Animasyon Şeridi */}
-      <View style={styles.bottomAnimationContainer} pointerEvents="none">
-        <Animated.View style={[styles.movingBackground, { transform: [{ translateX: scrollX }] }]}>
-          {[...Array(8)].map((_, i) => (
-            <View key={i} style={styles.logoRow}>
-              <Image source={require('../assets/images/pixel-logo.png')} style={styles.movingIcon} resizeMode="contain" />
-              <FontAwesome5 name="instagram" size={28} color="#A78BFA" style={{ marginHorizontal: 25 }} />
-              <Text style={{ fontSize: 28, fontWeight: '900', color: '#EC4899', marginHorizontal: 25 }}>𝕏</Text>
-              <FontAwesome5 name="tiktok" size={25} color="#25F4EE" style={{ marginHorizontal: 25 }} />
-            </View>
-          ))}
-        </Animated.View>
-      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0A0518' },
-  bottomAnimationContainer: { position: 'absolute', bottom: 10, left: 0, right: 0, height: 50, justifyContent: 'center', overflow: 'hidden', borderTopWidth: 2, borderBottomWidth: 2, borderColor: '#3B0764', backgroundColor: '#110826' },
-  movingBackground: { flexDirection: 'row', width: 4000 },
-  logoRow: { flexDirection: 'row', alignItems: 'center' },
-  movingIcon: { width: 32, height: 32, marginHorizontal: 25 },
-
-  content: { flex: 1, zIndex: 1, marginBottom: 65 },
+  content: { flex: 1, zIndex: 1, marginBottom: 20 },
   scrollArea: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40, alignItems: 'center' },
-  
   headerContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   logoImage: { width: 48, height: 48, marginRight: 12 },
-  title: { fontSize: 32, fontWeight: '900', color: '#FFFFFF', letterSpacing: 2, textShadowColor: '#EC4899', textShadowOffset: { width: 2, height: 2 }, textShadowRadius: 0 },
+  title: { fontSize: 32, fontWeight: '900', color: '#FFFFFF', letterSpacing: 2 },
   proBadge: { fontSize: 16, color: '#25F4EE', fontWeight: 'bold' },
-  subtitle: { color: '#A78BFA', fontSize: 11, textAlign: 'center', marginBottom: 26, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 1 },
+  subtitle: { color: '#A78BFA', fontSize: 11, textAlign: 'center', marginBottom: 16, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+  
+  proUpgradeBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1F1033', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 20, borderWidth: 2, borderColor: '#FBBF24', marginBottom: 10, shadowColor: '#FBBF24', shadowOpacity: 0.4, shadowRadius: 10 },
+  proUpgradeText: { color: '#FBBF24', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
+  restoreText: { color: '#8B5CF6', fontSize: 12, textDecorationLine: 'underline', fontWeight: 'bold' },
 
   platformSelector: { flexDirection: 'row', backgroundColor: '#170E33', borderRadius: 6, padding: 6, marginBottom: 24, width: '100%', justifyContent: 'space-between', borderWidth: 2, borderColor: '#4C1D95' },
   platformBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 4 },
   xLogoText: { fontSize: 24, fontWeight: '900' },
-
-  activeInstagram: { backgroundColor: '#8B5CF6', borderWidth: 2, borderColor: '#C4B5FD', shadowColor: '#8B5CF6', elevation: 8 },
-  activeX: { backgroundColor: '#31104D', borderWidth: 2, borderColor: '#A78BFA', shadowColor: '#A78BFA', elevation: 8 },
-  activeTiktok: { backgroundColor: '#EC4899', borderWidth: 2, borderColor: '#F472B6', shadowColor: '#EC4899', elevation: 8 },
-
-  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#170E33', borderRadius: 8, borderWidth: 2, borderColor: '#4C1D95', marginBottom: 12, paddingHorizontal: 16, width: '100%', shadowColor: '#EC4899', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.3, shadowRadius: 0, elevation: 4 },
+  activeInstagram: { backgroundColor: '#8B5CF6', borderWidth: 2, borderColor: '#C4B5FD' },
+  activeX: { backgroundColor: '#31104D', borderWidth: 2, borderColor: '#A78BFA' },
+  activeTiktok: { backgroundColor: '#EC4899', borderWidth: 2, borderColor: '#F472B6' },
+  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#170E33', borderRadius: 8, borderWidth: 2, borderColor: '#4C1D95', marginBottom: 12, paddingHorizontal: 16, width: '100%' },
   clearBtn: { marginRight: 10 },
   input: { flex: 1, paddingVertical: 16, color: '#F8FAFC', fontSize: 15 },
   pasteBtn: { padding: 10 },
-  hintText: { color: '#8B5CF6', fontSize: 11, textAlign: 'center', marginBottom: 20, paddingHorizontal: 8, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
-  
-  errorCard: { flexDirection: 'row', alignItems: 'center', width: '100%', backgroundColor: '#2A121A', borderRadius: 6, borderWidth: 2, borderColor: '#EF4444', padding: 12, marginBottom: 20 },
-  errorText: { color: '#FCA5A5', fontSize: 12, flex: 1 },
-  successCard: { flexDirection: 'row', alignItems: 'center', width: '100%', backgroundColor: '#0F2A1E', borderRadius: 6, borderWidth: 2, borderColor: '#10B981', padding: 12 },
-  successText: { color: '#6EE7B7', fontSize: 12, flex: 1 },
   loadingInfoContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  loadingInfoText: { color: '#EC4899', marginLeft: 8, fontSize: 13, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
-
-  previewCard: { width: '100%', backgroundColor: '#170E33', borderRadius: 8, padding: 14, borderWidth: 2, borderColor: '#8B5CF6', marginBottom: 20, alignItems: 'center', shadowColor: '#8B5CF6', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.4, shadowRadius: 0, elevation: 6 },
-  thumbnail: { width: '100%', height: 140, borderRadius: 4, marginBottom: 12, backgroundColor: '#110826' },
-  fallbackThumbnail: { width: '100%', height: 100, borderRadius: 4, marginBottom: 12, backgroundColor: '#110826', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#3B0764' },
-  fallbackText: { color: '#A78BFA', fontSize: 11, marginTop: 6, fontWeight: '600', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
-  titleContainer: { flexDirection: 'row', alignItems: 'center', width: '100%', paddingHorizontal: 4 },
+  loadingInfoText: { color: '#EC4899', marginLeft: 8, fontSize: 13, fontWeight: '700' },
+  errorCard: { width: '100%', backgroundColor: '#2A121A', borderRadius: 6, borderWidth: 2, borderColor: '#EF4444', padding: 12, marginBottom: 20 },
+  errorText: { color: '#FCA5A5', fontSize: 12 },
+  previewCard: { width: '100%', backgroundColor: '#170E33', borderRadius: 8, padding: 14, borderWidth: 2, borderColor: '#8B5CF6', marginBottom: 20, alignItems: 'center' },
+  thumbnail: { width: '100%', height: 140, borderRadius: 4, marginBottom: 12 },
+  fallbackThumbnail: { width: '100%', height: 100, borderRadius: 4, marginBottom: 12, backgroundColor: '#110826', justifyContent: 'center', alignItems: 'center' },
+  fallbackText: { color: '#A78BFA', fontSize: 11, marginTop: 6 },
+  titleContainer: { flexDirection: 'row', alignItems: 'center', width: '100%' },
   videoTitle: { color: '#F8FAFC', fontSize: 13, fontWeight: '600', flex: 1 },
-
-  downloadBtn: { flexDirection: 'row', width: '100%', paddingVertical: 18, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#F472B6', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 0.6, shadowRadius: 0, elevation: 8 },
-  btnInstagram: { backgroundColor: '#7C3AED', shadowColor: '#7C3AED' },
-  btnX: { backgroundColor: '#1F1033', shadowColor: '#EC4899' },
-  btnTiktok: { backgroundColor: '#DB2777', shadowColor: '#DB2777' },
-  downloadBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 1 },
-
-  // Modal Stilleri
+  downloadBtn: { flexDirection: 'row', width: '100%', paddingVertical: 18, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#F472B6' },
+  btnInstagram: { backgroundColor: '#7C3AED' },
+  btnX: { backgroundColor: '#1F1033' },
+  btnTiktok: { backgroundColor: '#DB2777' },
+  downloadBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(10, 5, 24, 0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { width: '100%', maxWidth: 360, backgroundColor: '#170E33', borderRadius: 12, borderWidth: 2, borderColor: '#EC4899', padding: 24, alignItems: 'center', shadowColor: '#EC4899', shadowOffset: { width: 4, height: 4 }, shadowOpacity: 0.5, shadowRadius: 0, elevation: 10 },
-  modalTitle: { color: '#25F4EE', fontSize: 16, fontWeight: '900', marginBottom: 8, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', textAlign: 'center' },
+  modalContent: { width: '100%', maxWidth: 360, backgroundColor: '#170E33', borderRadius: 12, borderWidth: 2, borderColor: '#EC4899', padding: 24, alignItems: 'center' },
+  modalTitle: { color: '#25F4EE', fontSize: 16, fontWeight: '900', marginBottom: 8 },
   modalSubtitle: { color: '#A78BFA', fontSize: 12, textAlign: 'center', marginBottom: 20 },
-  modalAdContainer: { width: '100%', height: 160, backgroundColor: '#110826', borderRadius: 8, borderWidth: 1, borderColor: '#4C1D95', justifyContent: 'center', alignItems: 'center', marginBottom: 20, overflow: 'hidden' },
-  modalBtn: { width: '100%', backgroundColor: '#10B981', paddingVertical: 14, borderRadius: 8, alignItems: 'center', borderWidth: 2, borderColor: '#34D399', marginBottom: 10 },
-  modalBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900', letterSpacing: 1 },
-  modalCloseBtn: { padding: 8 },
-  modalCloseText: { color: '#EF4444', fontSize: 12, fontWeight: '600' }
+  modalBtn: { width: '100%', backgroundColor: '#10B981', paddingVertical: 14, borderRadius: 8, alignItems: 'center', borderWidth: 2, borderColor: '#34D399' },
+  modalBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' }
 });
