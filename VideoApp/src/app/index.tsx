@@ -6,7 +6,6 @@ import {
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
-import * as MediaLibrary from 'expo-media-library';
 import { Link } from 'expo-router';
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || "https://video-downloader-cvtw.onrender.com").replace(/\/$/, "");
@@ -285,6 +284,9 @@ export default function App() {
         setDownloadSuccess(true);
         return;
       }
+
+      // Native modüller sadece mobilde yüklenir (web'de bulunmadıkları için import'ları sayfayı çökertiyordu)
+      const MediaLibrary: typeof import('expo-media-library') = require('expo-media-library');
 
       // Sadece "ekleme" izni (tüm galeriyi okuma izni istemez)
       const perm = await MediaLibrary.requestPermissionsAsync(true);
