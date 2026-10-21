@@ -7,6 +7,9 @@ import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Link } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AdBanner from '@/components/ad-banner';
+import { PaywallSheet, type PlanId } from '@/components/paywall-sheet';
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || "https://video-downloader-cvtw.onrender.com").replace(/\/$/, "");
 const INFO_TIMEOUT_MS = 70000;
@@ -14,6 +17,13 @@ const INFO_TIMEOUT_MS = 70000;
 // RevenueCat: gerçek SDK anahtarlarını EAS env / .env.local içinde tanımla (kodda tutma)
 const RC_ANDROID_KEY = process.env.EXPO_PUBLIC_RC_ANDROID_KEY || '';
 const RC_IOS_KEY = process.env.EXPO_PUBLIC_RC_IOS_KEY || '';
+// Sadece geliştirmede: mağaza kurulumu olmadan paywall tasarımını Expo'da görmek için sahte paketler
+const PAYWALL_PREVIEW = __DEV__ && process.env.EXPO_PUBLIC_PAYWALL_PREVIEW === '1';
+
+const MOCK_OFFERING = {
+  monthly: { packageType: 'MONTHLY', product: { price: 34.99, priceString: '₺34,99', introPrice: { price: 0, periodUnit: 'DAY', periodNumberOfUnits: 3 } } },
+  annual: { packageType: 'ANNUAL', product: { price: 349.99, priceString: '₺349,99', pricePerMonthString: '₺29,17', introPrice: { price: 0, periodUnit: 'DAY', periodNumberOfUnits: 3 } } },
+};
 const RC_ENTITLEMENT = 'pro_access';
 
 type Platform_ = 'instagram' | 'x' | 'tiktok';
@@ -54,6 +64,15 @@ export default function App() {
   // ABONELİK DURUMLARI (REVENUECAT)
   const [isAdFree, setIsAdFree] = useState(false);
   const [currentOffering, setCurrentOffering] = useState<any>(null);
+  const [paywallVisible, setPaywallVisible] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<PlanId>('annual');
+  const [purchasing, setPurchasing] = useState(false);
+  const paywallShownRef = useRef(false);
+  const insets = useSafeAreaInsets();
+  const [bannerState, setBannerState] = useState<'loading' | 'loaded' | 'failed'>('loading');
+
+  const monthlyPkg = currentOffering?.monthly ?? currentOffering?.availablePackages?.find((p: any) => p.packageType === 'MONTHLY') ?? null;
+  const annualPkg = currentOffering?.annual ?? currentOffering?.availablePackages?.find((p: any) => p.packageType === 'ANNUAL') ?? null;
 
   // Reklam dinleyicisi mount anında kurulur; güncel url/platform'u görmesi için ref kullanılır
   const executeDownloadRef = useRef<() => void>(() => {});
@@ -83,9 +102,13 @@ export default function App() {
 
   const setupRevenueCat = async () => {
     if (Platform.OS === 'web') return;
+    if (PAYWALL_PREVIEW) {
+      setCurrentOffering(MOCK_OFFERING);
+      return;
+    }
     const apiKey = Platform.OS === 'android' ? RC_ANDROID_KEY : RC_IOS_KEY;
-    // "test_" (Test Store) anahtarları yayın build'inde kullanılmamalı
-    if (!apiKey || apiKey.startsWith('test_')) return;
+    // "test_" (Test Store) anahtarları sadece geliştirmede çalışır, yayın build'inde kullanılmaz
+    if (!apiKey || (apiKey.startsWith('test_') && !__DEV__)) return;
     const Purchases = getPurchases();
     if (!Purchases) return;
     try {
@@ -100,22 +123,40 @@ export default function App() {
   };
 
   const buyAdFreeVersion = async () => {
-    const Purchases = getPurchases();
-    const pkg = currentOffering?.monthly ?? currentOffering?.availablePackages?.[0];
-    if (!Purchases || !pkg) {
+    const pkg = selectedPlan === 'annual' ? annualPkg : monthlyPkg;
+    if (!pkg) {
       Alert.alert('Paketler Yüklenemedi', 'Lütfen daha sonra tekrar deneyin.');
       return;
     }
+    if (PAYWALL_PREVIEW) {
+      Alert.alert('Önizleme modu', 'Gerçek satın alma için EXPO_PUBLIC_PAYWALL_PREVIEW değişkenini kaldırıp RevenueCat anahtarı kullanın.');
+      return;
+    }
+    const Purchases = getPurchases();
+    if (!Purchases) return;
+    setPurchasing(true);
     try {
       const { customerInfo } = await Purchases.purchasePackage(pkg);
       if (customerInfo.entitlements.active[RC_ENTITLEMENT]) {
         setIsAdFree(true);
+        setPaywallVisible(false);
         Alert.alert('Teşekkürler!', 'Reklamsız deneyimin tadını çıkar.');
       }
     } catch (e: any) {
       if (!e?.userCancelled) Alert.alert('Hata', 'Abonelik işlemi tamamlanamadı.');
+    } finally {
+      setPurchasing(false);
     }
   };
+
+  // Uygulamaya girince (paketler yüklenince) alttan paywall açılır; oturum başına bir kez
+  useEffect(() => {
+    if (Platform.OS === 'web' || isAdFree || paywallShownRef.current) return;
+    if (!monthlyPkg && !annualPkg) return;
+    paywallShownRef.current = true;
+    const t = setTimeout(() => setPaywallVisible(true), 1200);
+    return () => clearTimeout(t);
+  }, [currentOffering, isAdFree]);
 
   const restorePurchases = async () => {
     const Purchases = getPurchases();
@@ -124,6 +165,7 @@ export default function App() {
       const customerInfo = await Purchases.restorePurchases();
       if (customerInfo.entitlements.active[RC_ENTITLEMENT]) {
         setIsAdFree(true);
+        setPaywallVisible(false);
         Alert.alert('Başarılı', 'Aboneliğiniz geri yüklendi!');
       } else {
         Alert.alert('Bilgi', 'Aktif bir aboneliğiniz bulunamadı.');
@@ -345,40 +387,6 @@ export default function App() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.content}>
         <ScrollView contentContainerStyle={styles.scrollArea} showsVerticalScrollIndicator={false}>
           
-          {/* REKLAM ALANLARI */}
-          {!isAdFree && (
-            Platform.OS === 'web' ? (
-              <View style={{ width: '100%', alignItems: 'center', marginBottom: 20 }}>
-                {/* @ts-ignore */}
-                <ins
-                  className="adsbygoogle"
-                  style={{ display: 'block', width: '100%' }}
-                  data-ad-client="ca-pub-8754966775877680"
-                  data-ad-slot="4753170122"
-                  data-ad-format="auto"
-                  data-full-width-responsive="true"
-                />
-              </View>
-            ) : (
-              <View style={{ marginBottom: 20, alignItems: 'center', width: '100%' }}>
-                {(() => {
-                  try {
-                    const { BannerAd, BannerAdSize } = require('react-native-google-mobile-ads');
-                    return (
-                      <BannerAd
-                        unitId="ca-app-pub-8754966775877680/7883219165"
-                        size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-                        requestOptions={{ requestNonPersonalizedAdsOnly: true }}
-                      />
-                    );
-                  } catch (e) {
-                    return null;
-                  }
-                })()}
-              </View>
-            )
-          )}
-
           <View style={styles.headerContainer}>
             <Image source={require('../assets/images/pixel-logo.png')} style={styles.logoImage} resizeMode="contain" />
             <Text style={styles.title}>BitSaver <Text style={styles.proBadge}>PRO</Text></Text>
@@ -386,14 +394,11 @@ export default function App() {
           <Text style={styles.subtitle}>[ RETRO BIT-DOWNLOAD SYSTEM v2.0 ]</Text>
 
           {/* ABONELİK (PRO) ALANI */}
-          {!isAdFree && !!currentOffering && (
+          {!isAdFree && !!(monthlyPkg || annualPkg) && (
             <View style={{ alignItems: 'center', marginBottom: 24, width: '100%' }}>
-              <TouchableOpacity style={styles.proUpgradeBtn} onPress={buyAdFreeVersion}>
+              <TouchableOpacity style={styles.proUpgradeBtn} onPress={() => setPaywallVisible(true)}>
                 <Ionicons name="star" size={16} color="#FBBF24" style={{ marginRight: 6 }} />
                 <Text style={styles.proUpgradeText}>REKLAMLARI KALDIR [ PRO ]</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={restorePurchases}>
-                <Text style={styles.restoreText}>Satın Alımları Geri Yükle</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -498,11 +503,47 @@ export default function App() {
         <Link href="/terms" style={styles.footerLink}>Kullanım Şartları</Link>
         <Link href="/contact" style={styles.footerLink}>İletişim</Link>
       </View>
+
+      {/* REKLAM: en altta sabit; yer önceden ayrıldığı için içerik aşağı kaymaz */}
+      {!isAdFree && Platform.OS === 'web' && (
+        <View style={styles.webAdBox}>
+          {/* @ts-ignore */}
+          <ins
+            className="adsbygoogle"
+            style={{ display: 'block', width: '100%', minHeight: 90 }}
+            data-ad-client="ca-pub-8754966775877680"
+            data-ad-slot="4753170122"
+            data-ad-format="auto"
+            data-full-width-responsive="true"
+          />
+        </View>
+      )}
+      {!isAdFree && Platform.OS !== 'web' && bannerState !== 'failed' && (
+        <View style={[styles.adBar, { paddingBottom: insets.bottom }]}>
+          <AdBanner onLoaded={() => setBannerState('loaded')} onFailed={() => setBannerState('failed')} />
+        </View>
+      )}
+
+      {Platform.OS !== 'web' && (
+        <PaywallSheet
+          visible={paywallVisible}
+          onClose={() => setPaywallVisible(false)}
+          monthly={monthlyPkg}
+          annual={annualPkg}
+          selected={selectedPlan}
+          onSelect={setSelectedPlan}
+          onPurchase={buyAdFreeVersion}
+          onRestore={restorePurchases}
+          purchasing={purchasing}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  adBar: { width: '100%', minHeight: 60, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0A0518' },
+  webAdBox: { width: '100%', minHeight: 100, paddingHorizontal: 12, paddingBottom: 12 },
   footerLinks: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 16, paddingVertical: 14, paddingHorizontal: 12 },
   footerLink: { color: '#A78BFA', fontSize: 12 },
   container: { flex: 1, backgroundColor: '#0A0518' },
