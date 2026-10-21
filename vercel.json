@@ -1,8 +1,0 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "cd VideoApp && npm install",
-  "buildCommand": "cd VideoApp && npx expo export -p web",
-  "outputDirectory": "VideoApp/dist",
-  "cleanUrls": true,
-  "trailingSlash": false
-}
