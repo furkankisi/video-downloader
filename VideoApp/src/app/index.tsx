@@ -285,13 +285,21 @@ export default function App() {
         return;
       }
 
-      // Native modüller sadece mobilde yüklenir (web'de bulunmadıkları için import'ları sayfayı çökertiyordu)
-      const MediaLibrary: typeof import('expo-media-library') = require('expo-media-library');
+      // Native modül sadece mobilde yüklenir (web'de import etmek sayfayı çökertiyordu).
+      // SDK 57'de ana pakettaki saveToLibraryAsync çalışma zamanında hata fırlatır; "legacy" API kullanılmalı.
+      const MediaLibrary: typeof import('expo-media-library/legacy') = require('expo-media-library/legacy');
 
-      // Sadece "ekleme" izni (tüm galeriyi okuma izni istemez)
-      const perm = await MediaLibrary.requestPermissionsAsync(true);
-      if (!perm.granted) {
-        throw new Error('Galeriye kaydetmek için izin vermelisiniz.');
+      // Sadece "ekleme" izni. Android 13+ (API 33) galeriye video eklemek için izin gerektirmez;
+      // Android 12 ve altında WRITE_EXTERNAL_STORAGE, iOS'ta "Fotoğraflara ekle" izni istenir.
+      let permGranted = true;
+      try {
+        permGranted = (await MediaLibrary.requestPermissionsAsync(true)).granted;
+      } catch (e) {
+        console.log('Galeri izni sorgulanamadı:', e);
+      }
+      const needsPermission = Platform.OS === 'ios' || Number(Platform.Version) < 33;
+      if (needsPermission && !permGranted) {
+        throw new Error('Galeriye kaydetmek için izin vermelisiniz. Ayarlar > Uygulamalar > BitSaver Pro > İzinler bölümünden açabilirsiniz.');
       }
 
       const endpoint = `${API_BASE}/download-${platform}?url=${encodeURIComponent(link)}`;
@@ -308,7 +316,13 @@ export default function App() {
         throw new Error(msg);
       }
 
-      await MediaLibrary.saveToLibraryAsync(result.uri);
+      try {
+        await MediaLibrary.saveToLibraryAsync(result.uri);
+      } catch (saveErr) {
+        console.log('Galeriye kaydetme hatası:', saveErr);
+        await FileSystem.deleteAsync(result.uri, { idempotent: true });
+        throw new Error('Video indirildi ama galeriye kaydedilemedi. Lütfen galeri iznini kontrol edin.');
+      }
       await FileSystem.deleteAsync(result.uri, { idempotent: true });
 
       Alert.alert("Başarılı", "Video başarıyla galeriye kaydedildi! 📱");
