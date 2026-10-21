@@ -73,9 +73,5 @@
       }
     },
     "scheme": "bitsaverpro"
-  },
-  "react-native-google-mobile-ads": {
-    "android_app_id": "ca-app-pub-8754966775877680~5640199208",
-    "ios_app_id": "ca-app-pub-3940256099942544~1458002511"
   }
 }
