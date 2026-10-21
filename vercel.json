@@ -1,13 +1,8 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "VideoApp/package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
-    }
-  ],
-  "routes": [
-    { "src": "/(.*)", "dest": "/VideoApp/dist/$1" }
-  ]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd VideoApp && npm install",
+  "buildCommand": "cd VideoApp && npx expo export -p web",
+  "outputDirectory": "VideoApp/dist",
+  "cleanUrls": true,
+  "trailingSlash": false
 }

@@ -1,17 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity,
-  Animated, Easing, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image, ScrollView, Modal
+  KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image, ScrollView
 } from 'react-native';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
-// REVENUECAT EKLENDİ
-import Purchases, { LOG_LEVEL } from 'react-native-purchases';
+import { Link } from 'expo-router';
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || "https://video-downloader-cvtw.onrender.com").replace(/\/$/, "");
 const INFO_TIMEOUT_MS = 70000;
+
+// RevenueCat: gerçek SDK anahtarlarını EAS env / .env.local içinde tanımla (kodda tutma)
+const RC_ANDROID_KEY = process.env.EXPO_PUBLIC_RC_ANDROID_KEY || '';
+const RC_IOS_KEY = process.env.EXPO_PUBLIC_RC_IOS_KEY || '';
+const RC_ENTITLEMENT = 'pro_access';
 
 type Platform_ = 'instagram' | 'x' | 'tiktok';
 
@@ -52,9 +56,8 @@ export default function App() {
   const [isAdFree, setIsAdFree] = useState(false);
   const [currentOffering, setCurrentOffering] = useState<any>(null);
 
-  const [showRewardModal, setShowRewardModal] = useState(false);
-  const [rewardCountdown, setRewardCountdown] = useState(5);
-  const [rewardReady, setRewardReady] = useState(false);
+  // Reklam dinleyicisi mount anında kurulur; güncel url/platform'u görmesi için ref kullanılır
+  const executeDownloadRef = useRef<() => void>(() => {});
 
   const [rewardedLoaded, setRewardedLoaded] = useState(false);
   const rewardedAdRef = useRef<any>(null);
@@ -66,92 +69,70 @@ export default function App() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
 
-  const scrollX = useRef(new Animated.Value(0)).current;
-
-  // REVENUECAT BAŞLATMA
+  // REVENUECAT: sadece native'de, gerçek SDK anahtarı varsa çalışır
   useEffect(() => {
     setupRevenueCat();
   }, []);
 
-  const setupRevenueCat = async () => {
+  const getPurchases = () => {
     try {
-      if (Platform.OS === 'web') return; // Web'de RevenueCat çalışmaz
-
-      Purchases.setLogLevel(LOG_LEVEL.DEBUG);
-      
-      // DİKKAT: BURAYA KENDİ REVENUECAT API KEYLERİNİ GİRECEKSİN!
-      if (Platform.OS === 'android') {
-        Purchases.configure({ apiKey: "test_pXiDHTDUcMaHQtpATQGhrMrIwAr" }); 
-      } else if (Platform.OS === 'ios') {
-        Purchases.configure({ apiKey: "test_pXiDHTDUcMaHQtpATQGhrMrIwAr" });
-      }
-
-      // Aktif aboneliği kontrol et
-      const customerInfo = await Purchases.getCustomerInfo();
-      // 'pro_access', RevenueCat panelinde oluşturduğumuz Entitlement ID olacak
-      if (typeof customerInfo.entitlements.active.pro_access !== "undefined") {
-        setIsAdFree(true);
-      }
-
-      // Paketleri getir
-      const offerings = await Purchases.getOfferings();
-      if (offerings.current !== null) {
-        setCurrentOffering(offerings.current);
-      }
-    } catch (e) {
-      console.log("RevenueCat hatası:", e);
+      return require('react-native-purchases').default;
+    } catch {
+      return null;
     }
   };
 
-  // ABONE OLMA FONKSİYONU
+  const setupRevenueCat = async () => {
+    if (Platform.OS === 'web') return;
+    const apiKey = Platform.OS === 'android' ? RC_ANDROID_KEY : RC_IOS_KEY;
+    // "test_" (Test Store) anahtarları yayın build'inde kullanılmamalı
+    if (!apiKey || apiKey.startsWith('test_')) return;
+    const Purchases = getPurchases();
+    if (!Purchases) return;
+    try {
+      Purchases.configure({ apiKey });
+      const customerInfo = await Purchases.getCustomerInfo();
+      if (customerInfo.entitlements.active[RC_ENTITLEMENT]) setIsAdFree(true);
+      const offerings = await Purchases.getOfferings();
+      if (offerings.current) setCurrentOffering(offerings.current);
+    } catch (e) {
+      console.log('RevenueCat hatası:', e);
+    }
+  };
+
   const buyAdFreeVersion = async () => {
-    if (!currentOffering) {
-      Alert.alert("Paketler Yükleniyor", "Lütfen birkaç saniye bekleyip tekrar deneyin.");
+    const Purchases = getPurchases();
+    const pkg = currentOffering?.monthly ?? currentOffering?.availablePackages?.[0];
+    if (!Purchases || !pkg) {
+      Alert.alert('Paketler Yüklenemedi', 'Lütfen daha sonra tekrar deneyin.');
       return;
     }
-
     try {
-      // Aylık paketi satın al (3 Gün Bedava olacak şekilde Play Console'da ayarlı)
-      const { customerInfo } = await Purchases.purchasePackage(currentOffering.monthly);
-      
-      if (typeof customerInfo.entitlements.active.pro_access !== "undefined") {
+      const { customerInfo } = await Purchases.purchasePackage(pkg);
+      if (customerInfo.entitlements.active[RC_ENTITLEMENT]) {
         setIsAdFree(true);
-        Alert.alert("Aramıza Hoş Geldin!", "İlk 3 gün tamamen ücretsiz. Reklamsız deneyimin tadını çıkar!");
+        Alert.alert('Teşekkürler!', 'Reklamsız deneyimin tadını çıkar.');
       }
     } catch (e: any) {
-      if (!e.userCancelled) {
-        Alert.alert("Hata", "Abonelik işlemi tamamlanamadı.");
-      }
+      if (!e?.userCancelled) Alert.alert('Hata', 'Abonelik işlemi tamamlanamadı.');
     }
   };
 
-  // SATIN ALIMLARI GERİ YÜKLE (Kullanıcı uygulamayı silip yüklerse vs.)
   const restorePurchases = async () => {
+    const Purchases = getPurchases();
+    if (!Purchases) return;
     try {
       const customerInfo = await Purchases.restorePurchases();
-      if (typeof customerInfo.entitlements.active.pro_access !== "undefined") {
+      if (customerInfo.entitlements.active[RC_ENTITLEMENT]) {
         setIsAdFree(true);
-        Alert.alert("Başarılı", "Aboneliğiniz başarıyla geri yüklendi!");
+        Alert.alert('Başarılı', 'Aboneliğiniz geri yüklendi!');
       } else {
-        Alert.alert("Bilgi", "Aktif bir aboneliğiniz bulunamadı.");
+        Alert.alert('Bilgi', 'Aktif bir aboneliğiniz bulunamadı.');
       }
-    } catch (e) {
-      Alert.alert("Hata", "Geri yükleme işlemi başarısız oldu.");
+    } catch {
+      Alert.alert('Hata', 'Geri yükleme işlemi başarısız oldu.');
     }
   };
-
-  useEffect(() => {
-    const startAnimation = () => {
-      scrollX.setValue(0);
-      Animated.timing(scrollX, {
-        toValue: -1200,
-        duration: 30000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }).start(() => startAnimation());
-    };
-    startAnimation();
-  }, []);
 
   useEffect(() => {
     if (Platform.OS === 'web' && !isAdFree) {
@@ -164,36 +145,29 @@ export default function App() {
 
   useEffect(() => {
     if (Platform.OS !== 'web' && !isAdFree) {
-      try {
-        const { RewardedAd, RewardedAdEventType, TestIds } = require('react-native-google-mobile-ads');
-        const adUnitId = __DEV__ ? TestIds.REWARDED : 'ca-app-pub-8754966775877680/2878129487';
+    try {
+      const { RewardedAd, RewardedAdEventType, AdEventType, TestIds } = require('react-native-google-mobile-ads');
+      const adUnitId = __DEV__ ? TestIds.REWARDED : 'ca-app-pub-8754966775877680/2878129487';
+      const rewarded = RewardedAd.createForAdRequest(adUnitId, { requestNonPersonalizedAdsOnly: true });
+      rewardedAdRef.current = rewarded;
 
-        const rewarded = RewardedAd.createForAdRequest(adUnitId, {
-          requestNonPersonalizedAdsOnly: true,
-        });
+      const offLoaded = rewarded.addAdEventListener(RewardedAdEventType.LOADED, () => setRewardedLoaded(true));
+      const offEarned = rewarded.addAdEventListener(RewardedAdEventType.EARNED_REWARD, () => executeDownloadRef.current());
+      const offClosed = rewarded.addAdEventListener(AdEventType.CLOSED, () => {
+        setRewardedLoaded(false);
+        rewarded.load(); // sonraki indirme için yeni reklam
+      });
+      const offError = rewarded.addAdEventListener(AdEventType.ERROR, () => setRewardedLoaded(false));
+      rewarded.load();
 
-        rewardedAdRef.current = rewarded;
-        const unsubscribeLoaded = rewarded.addAdEventListener(RewardedAdEventType.LOADED, () => setRewardedLoaded(true));
-        const unsubscribeEarned = rewarded.addAdEventListener(RewardedAdEventType.EARNED_REWARD, () => executeDownload());
-        rewarded.load();
-
-        return () => {
-          unsubscribeLoaded();
-          unsubscribeEarned();
-        };
-      } catch (e) {}
+      return () => {
+        offLoaded(); offEarned(); offClosed(); offError();
+      };
+    } catch (e) {
+      console.log('Rewarded reklam başlatılamadı:', e);
+    }
     }
   }, [isAdFree]);
-
-  useEffect(() => {
-    let timer: any;
-    if (showRewardModal && rewardCountdown > 0) {
-      timer = setTimeout(() => setRewardCountdown(prev => prev - 1), 1000);
-    } else if (showRewardModal && rewardCountdown === 0) {
-      setRewardReady(true);
-    }
-    return () => clearTimeout(timer);
-  }, [showRewardModal, rewardCountdown]);
 
   const handleTabPress = (targetPlatform: Platform_) => {
     if (url.trim().length > 0) {
@@ -272,23 +246,17 @@ export default function App() {
   };
 
   const triggerDownloadProcess = () => {
-    if (isAdFree) {
-      executeDownload();
-      return;
-    }
-    if (Platform.OS !== 'web' && rewardedAdRef.current && rewardedLoaded) {
+    // Abone, web veya reklam hazır değilse doğrudan indir (kullanıcıyı bekletme / sahte reklam yok)
+    if (!isAdFree && Platform.OS !== 'web' && rewardedAdRef.current && rewardedLoaded) {
       try {
         rewardedAdRef.current.show();
         return;
-      } catch (e) {}
+      } catch {}
     }
-    setRewardCountdown(5);
-    setRewardReady(false);
-    setShowRewardModal(true);
+    executeDownload();
   };
 
   const executeDownload = async () => {
-    setShowRewardModal(false);
     setIsDownloading(true);
     setDownloadError(null);
     setDownloadSuccess(false);
@@ -304,7 +272,7 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: link }),
         });
-        if (!res.ok) throw new Error("İndirme başarısız.");
+        if (!res.ok) throw new Error(await readError(res, 'İndirme başarısız.'));
         const blob = await res.blob();
         const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -318,21 +286,28 @@ export default function App() {
         return;
       }
 
-      // GALERİYE KAYDETME (MediaLibrary)
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
-        throw new Error("Galeriye kaydetmek için izin vermelisiniz.");
+      // Sadece "ekleme" izni (tüm galeriyi okuma izni istemez)
+      const perm = await MediaLibrary.requestPermissionsAsync(true);
+      if (!perm.granted) {
+        throw new Error('Galeriye kaydetmek için izin vermelisiniz.');
       }
 
       const endpoint = `${API_BASE}/download-${platform}?url=${encodeURIComponent(link)}`;
-      const fileUri = `${FileSystem.documentDirectory}${filename}`;
-      const downloadResumable = FileSystem.createDownloadResumable(endpoint, fileUri);
-      const result = await downloadResumable.downloadAsync();
+      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+      const result = await FileSystem.createDownloadResumable(endpoint, fileUri).downloadAsync();
 
-      if (!result || result.status !== 200) throw new Error("Video indirilemedi.");
+      if (!result || result.status !== 200) {
+        let msg = 'Video indirilemedi.';
+        try {
+          const j = JSON.parse(await FileSystem.readAsStringAsync(result!.uri));
+          if (typeof j?.detail === 'string') msg = j.detail;
+        } catch {}
+        if (result) await FileSystem.deleteAsync(result.uri, { idempotent: true });
+        throw new Error(msg);
+      }
 
-      const asset = await MediaLibrary.createAssetAsync(result.uri);
-      await MediaLibrary.createAlbumAsync("BitSaverPro", asset, false);
+      await MediaLibrary.saveToLibraryAsync(result.uri);
+      await FileSystem.deleteAsync(result.uri, { idempotent: true });
 
       Alert.alert("Başarılı", "Video başarıyla galeriye kaydedildi! 📱");
       setDownloadSuccess(true);
@@ -344,6 +319,8 @@ export default function App() {
       setIsDownloading(false);
     }
   };
+
+  executeDownloadRef.current = executeDownload;
 
   const platformLabel = PLATFORM_LABELS[activePlatform];
 
@@ -393,11 +370,11 @@ export default function App() {
           <Text style={styles.subtitle}>[ RETRO BIT-DOWNLOAD SYSTEM v2.0 ]</Text>
 
           {/* ABONELİK (PRO) ALANI */}
-          {!isAdFree && (
+          {!isAdFree && !!currentOffering && (
             <View style={{ alignItems: 'center', marginBottom: 24, width: '100%' }}>
               <TouchableOpacity style={styles.proUpgradeBtn} onPress={buyAdFreeVersion}>
                 <Ionicons name="star" size={16} color="#FBBF24" style={{ marginRight: 6 }} />
-                <Text style={styles.proUpgradeText}>REKLAMLARI KALDIR [ İLK 3 GÜN ÜCRETSİZ ]</Text>
+                <Text style={styles.proUpgradeText}>REKLAMLARI KALDIR [ PRO ]</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={restorePurchases}>
                 <Text style={styles.restoreText}>Satın Alımları Geri Yükle</Text>
@@ -499,24 +476,19 @@ export default function App() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <Modal visible={showRewardModal} transparent={true} animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>[ ÖDÜLLÜ İNDİRME AKTİF ]</Text>
-            <Text style={styles.modalSubtitle}>
-              {rewardReady ? "Ödülünüz hazır!" : `Reklam yükleniyor, lütfen ${rewardCountdown} saniye bekleyin...`}
-            </Text>
-            <TouchableOpacity style={[styles.modalBtn, !rewardReady && { backgroundColor: '#4B5563' }]} disabled={!rewardReady} onPress={executeDownload}>
-              <Text style={styles.modalBtnText}>{rewardReady ? "İNDİR" : `BEKLENİYOR (${rewardCountdown}s)`}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <View style={styles.footerLinks}>
+        <Link href="/about" style={styles.footerLink}>Hakkında</Link>
+        <Link href="/privacy" style={styles.footerLink}>Gizlilik</Link>
+        <Link href="/terms" style={styles.footerLink}>Kullanım Şartları</Link>
+        <Link href="/contact" style={styles.footerLink}>İletişim</Link>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  footerLinks: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 16, paddingVertical: 14, paddingHorizontal: 12 },
+  footerLink: { color: '#A78BFA', fontSize: 12 },
   container: { flex: 1, backgroundColor: '#0A0518' },
   content: { flex: 1, zIndex: 1, marginBottom: 20 },
   scrollArea: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40, alignItems: 'center' },
@@ -555,10 +527,4 @@ const styles = StyleSheet.create({
   btnX: { backgroundColor: '#1F1033' },
   btnTiktok: { backgroundColor: '#DB2777' },
   downloadBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(10, 5, 24, 0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { width: '100%', maxWidth: 360, backgroundColor: '#170E33', borderRadius: 12, borderWidth: 2, borderColor: '#EC4899', padding: 24, alignItems: 'center' },
-  modalTitle: { color: '#25F4EE', fontSize: 16, fontWeight: '900', marginBottom: 8 },
-  modalSubtitle: { color: '#A78BFA', fontSize: 12, textAlign: 'center', marginBottom: 20 },
-  modalBtn: { width: '100%', backgroundColor: '#10B981', paddingVertical: 14, borderRadius: 8, alignItems: 'center', borderWidth: 2, borderColor: '#34D399' },
-  modalBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' }
 });

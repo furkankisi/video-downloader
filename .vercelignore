@@ -1,0 +1,6 @@
+# Python backend Render'da çalışıyor; Vercel web build'ine dahil etme
+api
+*.py
+requirements.txt
+apt.txt
+__pycache__

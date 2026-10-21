@@ -1,49 +1,26 @@
-import { StyleSheet, Text, View, ScrollView } from 'react-native';
-import Head from 'expo-router/head';
+import { LegalPage } from '@/components/legal-page';
 
-export default function PrivacyPolicy() {
+export default function Privacy() {
   return (
-    <ScrollView style={styles.container}>
-      <Head>
-        <title>Gizlilik Politikası - BitSaver Pro</title>
-      </Head>
-      <View style={styles.content}>
-        <Text style={styles.title}>Gizlilik Politikası</Text>
-        <Text style={styles.date}>Son güncellenme tarihi: Ekim 2026</Text>
-        
-        <Text style={styles.paragraph}>
-          BitSaver Pro ("Uygulama") kullanıcılarının gizliliğine ve veri güvenliğine büyük önem verir. Bu gizlilik politikası, uygulamamızı ve web sitemizi kullandığınızda hangi bilgilerin işlendiğini açıklar.
-        </Text>
-
-        <Text style={styles.heading}>1. Toplanan Veriler</Text>
-        <Text style={styles.paragraph}>
-          BitSaver Pro, video indirme işlemlerini doğrudan cihazınızda veya güvenli altyapılar üzerinden gerçekleştirir. Kişisel verilerinizi sunucularımızda kalıcı olarak depolamaz. Hizmet kalitesini artırmak amacıyla Google Analytics ve Google AdSense gibi standart üçüncü taraf analiz/reklam araçları anonim veriler toplayabilir.
-        </Text>
-
-        <Text style={styles.heading}>2. Reklamlar ve Çerezler</Text>
-        <Text style={styles.paragraph}>
-          Uygulamamızda ve web sitemizde Google AdSense aracılığıyla reklamlar gösterilmektedir. Google, kullanıcıların web sitenize veya diğer sitelere yaptığı önceki ziyaretlere dayalı olarak reklam sunmak için çerezleri kullanır.
-        </Text>
-
-        <Text style={styles.heading}>3. Çocukların Gizliliği</Text>
-        <Text style={styles.paragraph}>
-          Uygulamamız 13 yaş altındaki çocukları bilerek hedeflemez ve onlardan bilerek kişisel bilgi toplamaz.
-        </Text>
-
-        <Text style={styles.heading}>4. İletişim</Text>
-        <Text style={styles.paragraph}>
-          Gizlilik politikamızla ilgili her türlü soru ve öneriniz için bizimle iletişime geçebilirsiniz.
-        </Text>
-      </View>
-    </ScrollView>
+    <LegalPage
+      title="Gizlilik Politikası"
+      description="BitSaver Pro gizlilik politikası: hangi veriler işlenir, reklamlar ve abonelikler nasıl çalışır."
+      sections={[
+        { heading: '1. Genel', body: ['BitSaver Pro ("Uygulama"), kullanıcının girdiği bağlantıdaki videoyu cihazına indirmesine yardımcı olan bir araçtır. Hesap oluşturmanız gerekmez ve ad, e-posta gibi kişisel bilgilerinizi sizden talep etmeyiz.'] },
+        { heading: '2. İşlenen veriler', body: [
+          'Girdiğiniz video bağlantısı, indirme isteğini gerçekleştirmek için sunucumuza gönderilir ve işlem bittikten sonra geçici dosyalar silinir. Bağlantılarınızı kalıcı olarak saklamayız.',
+          'Sunucu, teknik işleyiş için standart günlük kayıtları (IP adresi, zaman damgası, hata bilgisi) tutabilir.',
+        ] },
+        { heading: '3. Reklamlar', body: [
+          'Mobil uygulamada Google AdMob, web sitesinde Google AdSense ile reklam gösterilir. Google ve ortakları, reklam sunmak ve ölçmek için çerezler, reklam kimlikleri ve benzeri teknolojiler kullanabilir. Avrupa Ekonomik Alanı, Birleşik Krallık ve ilgili diğer bölgelerde reklamlar için onayınız istenir ve tercihinizi dilediğiniz zaman değiştirebilirsiniz.',
+          'Google\'ın verileri nasıl kullandığını https://policies.google.com/technologies/partner-sites adresinden öğrenebilir, kişiselleştirilmiş reklamları https://adssettings.google.com adresinden kapatabilirsiniz.',
+        ] },
+        { heading: '4. Abonelikler', body: ['Reklamsız kullanım için isteğe bağlı abonelik sunulabilir. Satın alma işlemleri Google Play / App Store tarafından yürütülür; abonelik durumunu doğrulamak için RevenueCat hizmeti kullanılır. Ödeme bilgileriniz bize ulaşmaz.'] },
+        { heading: '5. Analiz', body: ['Web sitesinde kullanım istatistikleri için Google Analytics kullanılır. Bu veriler anonim ve toplu şekilde değerlendirilir.'] },
+        { heading: '6. Galeri izni', body: ['İndirilen videoyu galerinize kaydetmek için yalnızca "ekleme" izni istenir. Galerinizdeki diğer içerikleri okumayız.'] },
+        { heading: '7. Çocuklar', body: ['Uygulama 13 yaşından küçük çocuklara yönelik değildir ve onlardan bilerek veri toplamaz.'] },
+        { heading: '8. İletişim ve haklarınız', body: ['Verilerinizle ilgili talepleriniz için furkankisi0@gmail.com adresine yazabilirsiniz.'] },
+      ]}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0A0518', padding: 20 },
-  content: { maxWidth: 800, alignSelf: 'center', width: '100%', paddingBottom: 60, paddingTop: 20 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 5 },
-  date: { fontSize: 14, color: '#aaa', marginBottom: 25 },
-  heading: { fontSize: 18, fontWeight: 'bold', color: '#fff', marginTop: 25, marginBottom: 10 },
-  paragraph: { fontSize: 15, color: '#ccc', lineHeight: 24, marginBottom: 10 },
-});

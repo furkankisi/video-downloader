@@ -6,19 +6,23 @@ import { Platform } from 'react-native';
 
 export default function RootLayout() {
   
-  // AdMob'u sadece mobil cihazlarda güvenli bir şekilde başlat
+  // AdMob: önce kullanıcı onayı (UMP/GDPR), sonra başlatma. Sadece mobilde.
   useEffect(() => {
+    // NOT: Platform.OS !== 'web' bloğu web bundle'dan çıkarılır (native modül web'de derlenemez)
     if (Platform.OS !== 'web') {
+    (async () => {
       try {
-        const mobileAds = require('react-native-google-mobile-ads').default;
-        mobileAds()
-          .initialize()
-          .then(() => {
-            console.log("AdMob Başarı ile Başlatıldı kanka!");
-          });
+        const ads = require('react-native-google-mobile-ads');
+        try {
+          await ads.AdsConsent.gatherConsent();
+        } catch (e) {
+          console.log('Onay formu hatası:', e);
+        }
+        await ads.default().initialize();
       } catch (e) {
-        console.log("AdMob başlatılamadı:", e);
+        console.log('AdMob başlatılamadı:', e);
       }
+    })();
     }
   }, []);
 
@@ -30,7 +34,8 @@ export default function RootLayout() {
         <meta name="keywords" content="video indirici, instagram downloader, tiktok video indir, x video indir, bitsaver pro" />
         
         {/* Özel Favicon (Tarayıcı Sekme Logosu) */}
-        <link rel="icon" href="/pixel-logo.png" />
+        <link rel="icon" href="/favicon.png" />
+        <meta name="google-adsense-account" content="ca-pub-8754966775877680" />
 
         {/* Google AdSense Kodu */}
         <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8754966775877680" crossOrigin="anonymous"></script>

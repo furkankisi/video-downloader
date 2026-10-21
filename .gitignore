@@ -8,3 +8,8 @@ __pycache__/
 *.pyc
 .DS_Store
 bgutil-ytdlp-pot-provider/
+credentials.json
+my-upload-key.jks
+*.jks
+@furkankisi__video-downloader.bak*
+upload_certificate.pem
