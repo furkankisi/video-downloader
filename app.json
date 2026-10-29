@@ -1,0 +1,82 @@
+{
+  "expo": {
+    "name": "BitSaver Pro",
+    "slug": "video-downloader",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./src/assets/images/pixel-logo.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./src/assets/images/pixel-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0518"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bitsaverpro",
+      "infoPlist": {
+        "NSPhotoLibraryAddUsageDescription": "İndirdiğiniz videoları galerinize kaydetmek için gerekli.",
+        "NSPhotoLibraryUsageDescription": "İndirdiğiniz videoları galerinize kaydetmek için gerekli.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.bitsaverpro",
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/images/pixel-logo.png",
+        "backgroundColor": "#0A0518"
+      },
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "com.android.vending.BILLING"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./src/assets/images/pixel-logo.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "İndirdiğiniz videoları galerinize kaydetmek için gerekli.",
+          "savePhotosPermission": "İndirdiğiniz videoları galerinize kaydetmek için gerekli.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-8754966775877680~5640199208",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ],
+      "expo-sharing",
+      "expo-splash-screen"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "90572653-fbfc-4401-856e-79117466d4d9"
+      }
+    },
+    "scheme": "bitsaverpro"
+  },
+  "react-native-google-mobile-ads": {
+    "android_app_id": "ca-app-pub-8754966775877680~5640199208",
+    "ios_app_id": "ca-app-pub-3940256099942544~1458002511"
+  }
+}
