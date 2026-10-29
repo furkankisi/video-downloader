@@ -1,4 +1,6 @@
 fastapi
-uvicorn
-yt-dlp
-requests
+uvicorn[standard]
+pydantic
+httpx
+yt-dlp[default,curl-cffi]
+imageio-ffmpeg

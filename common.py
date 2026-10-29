@@ -1,0 +1,268 @@
+"""Ortak yardımcılar: yt-dlp ayarları, geçici dosya temizliği, hata metinleri."""
+import os
+import re
+import shutil
+import subprocess
+import time
+import uuid
+from pathlib import Path
+from typing import Optional
+
+DOWNLOAD_DIR = Path(os.getenv("DOWNLOAD_DIR", "downloads"))
+MIN_FILE_SIZE = 30_000          # bundan küçük dosya = bozuk
+MAX_FILE_AGE_SECONDS = 60 * 60  # 1 saatten eski geçici dosyalar silinir
+
+URL_RE = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+
+
+# --------------------------------------------------------------------------- #
+# URL
+# --------------------------------------------------------------------------- #
+def extract_url(text: str) -> str:
+    """'Şu videoya bak https://vm.tiktok.com/xyz/ #fyp' gibi paylaşım metninden linki çeker."""
+    text = (text or "").strip()
+    m = URL_RE.search(text)
+    return m.group(0).rstrip(").,;") if m else text
+
+
+def resolve_redirect(url: str, hosts: tuple) -> str:
+    """Kısa/yönlendirme linklerini (vm.tiktok.com, t.co, ...) gerçek adrese çevirir."""
+    if any(h in url for h in hosts):
+        try:
+            import httpx
+            r = httpx.get(url, headers={"User-Agent": DESKTOP_UA}, follow_redirects=True, timeout=12)
+            return str(r.url).split("?")[0]
+        except Exception as e:
+            print("Yönlendirme çözülemedi:", e)
+    return url
+
+
+# --------------------------------------------------------------------------- #
+# Dosya işlemleri
+# --------------------------------------------------------------------------- #
+def new_output_path(ext: str = "mp4") -> Path:
+    DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    return DOWNLOAD_DIR / f"{uuid.uuid4()}.{ext}"
+
+
+def remove_files_with_stem(path: Path) -> None:
+    """video.mp4 + yt-dlp'nin bıraktığı .part/.f137.mp4/.webm gibi artıkları siler."""
+    try:
+        for p in path.parent.glob(f"{path.stem}*"):
+            try:
+                p.unlink()
+            except OSError:
+                pass
+    except Exception:
+        pass
+
+
+def cleanup_old_files() -> None:
+    if not DOWNLOAD_DIR.exists():
+        return
+    limit = time.time() - MAX_FILE_AGE_SECONDS
+    for p in DOWNLOAD_DIR.iterdir():
+        try:
+            if p.is_file() and p.stat().st_mtime < limit:
+                p.unlink()
+        except OSError:
+            pass
+
+
+def find_output(path: Path) -> Optional[Path]:
+    """yt-dlp bazen uzantıyı değiştirir (mkv/webm). Gerçek çıktı dosyasını bul."""
+    if path.exists():
+        return path
+    for p in sorted(path.parent.glob(f"{path.stem}.*")):
+        if p.suffix not in (".part", ".ytdl", ".json"):
+            return p
+    return None
+
+
+# --------------------------------------------------------------------------- #
+# yt-dlp ortak ayarlar
+# --------------------------------------------------------------------------- #
+def ffmpeg_path() -> Optional[str]:
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return None
+
+
+def base_ydl_opts() -> dict:
+    """
+    Tüm platformlar için ortak yt-dlp ayarları.
+    Ortam değişkeni:
+      PROXY_URL -> http://user:pass@host:port  (bir platform IP'yi engellerse)
+    """
+    opts: dict = {
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "socket_timeout": 25,
+        "retries": 3,
+        "fragment_retries": 3,
+        "http_headers": {"User-Agent": DESKTOP_UA},
+        "merge_output_format": "mp4",
+    }
+    ff = ffmpeg_path()
+    if ff:
+        opts["ffmpeg_location"] = ff
+    proxy = os.getenv("PROXY_URL")
+    if proxy:
+        opts["proxy"] = proxy
+    return opts
+
+
+# En sağlam sıralama: önce h264 (her cihaz/tarayıcı oynatır), olmazsa yine de bir şey indir.
+# ÖNEMLİ: sadece "b[ext=mp4]" gibi codec belirtmeyen bir seçici, iPhone'un DECODE EDEMEDİĞİ
+# vp9/av1 video + normal ses içeren bir mp4 seçebiliyordu. Sonuç: dosya "iniyor" ama iPhone'da
+# sadece ses çalıp görüntü hiç açılmıyordu (ses her zaman AAC/decode edilebilir, video değildi).
+VIDEO_FORMAT = (
+    "b[vcodec^=h264][ext=mp4]/b[vcodec^=avc][ext=mp4]/"
+    "bv*[vcodec^=h264][ext=mp4]+ba[ext=m4a]/bv*[vcodec^=avc1]+ba/"
+    "b[ext=mp4]/bv*+ba/b"
+)
+
+_H264_NAMES = ("h264", "avc")
+
+
+def _probe_video_codec(path: Path, ffmpeg: str) -> Optional[str]:
+    """ffprobe'a bağımlı kalmadan (bazı ortamlarda kurulu olmayabiliyor) ffmpeg'in kendi
+    çıktısından video codec adını okur."""
+    try:
+        proc = subprocess.run(
+            [ffmpeg, "-i", str(path)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=15,
+        )
+        text = proc.stderr.decode("utf-8", "ignore")
+        m = re.search(r"Video:\s*([a-zA-Z0-9_]+)", text)
+        return m.group(1).lower() if m else None
+    except Exception:
+        return None
+
+
+def ensure_h264(path: Path) -> Path:
+    """
+    Son güvenlik ağı: format seçimi yine de h264 olmayan bir video getirirse (örn. kaynakta
+    hiç h264 seçeneği yoksa), dosyayı iPhone/Android/tarayıcıların garanti oynattığı
+    h264 + aac'ye çevirir. Zaten h264 ise dokunmadan aynı dosyayı döndürür.
+    """
+    ff = ffmpeg_path()
+    if not ff:
+        return path
+    codec = _probe_video_codec(path, ff)
+    if codec is None or any(codec.startswith(n) for n in _H264_NAMES):
+        return path
+
+    out = path.with_name(path.stem + "_h264.mp4")
+    try:
+        subprocess.run(
+            [ff, "-y", "-i", str(path),
+             "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
+             "-c:a", "aac", "-b:a", "128k",
+             "-movflags", "+faststart", str(out)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=240, check=True,
+        )
+        path.unlink(missing_ok=True)
+        return out
+    except Exception as e:
+        print("H264 dönüştürme hatası (orijinal dosya kullanılıyor):", e)
+        return path
+
+
+def cookie_source(env_b64: str, env_path: str) -> Optional[str]:
+    """
+    Çerezi ORTAMDAN al (repoya asla commit etme). Ya base64 (tek satır, panele yapıştırmak
+    kolay) ya da bir dosya yolu olabilir. Instagram gibi giriş isteyen platformlarda kullanılır.
+    """
+    import base64
+    import tempfile
+
+    b64 = os.getenv(env_b64)
+    if b64:
+        try:
+            fd, tmp = tempfile.mkstemp(suffix=".txt")
+            with os.fdopen(fd, "wb") as f:
+                f.write(base64.b64decode(b64))
+            return tmp
+        except Exception as e:
+            print("Çerez çözülemedi:", e)
+            return None
+    path = os.getenv(env_path)
+    if path and os.path.exists(path):
+        # yt-dlp cookie dosyasına geri yazabiliyor; salt-okunur bir secret file'da hata
+        # olmasın diye yazılabilir bir geçiciye kopyala
+        fd, tmp = tempfile.mkstemp(suffix=".txt")
+        os.close(fd)
+        shutil.copyfile(path, tmp)
+        return tmp
+    return None
+
+
+def cleanup_cookiefile(opts: dict) -> None:
+    import tempfile
+    ck = opts.get("cookiefile")
+    if ck and ck.startswith(tempfile.gettempdir()):
+        try:
+            os.unlink(ck)
+        except OSError:
+            pass
+
+
+def try_impersonate(opts: dict) -> dict:
+    """curl_cffi kuruluysa TLS parmak izi kontrollerini geçmek için tarayıcı taklidi yap."""
+    try:
+        import curl_cffi  # noqa: F401
+        from yt_dlp.networking.impersonate import ImpersonateTarget
+        opts = dict(opts)
+        opts["impersonate"] = ImpersonateTarget("chrome")
+    except Exception:
+        pass
+    return opts
+
+
+def ydl_attempts() -> list:
+    """Sırayla denenecek yt-dlp ayarları: önce sade, olmazsa Chrome taklidiyle."""
+    return [base_ydl_opts(), try_impersonate(base_ydl_opts())]
+
+
+# --------------------------------------------------------------------------- #
+# Hata mesajları
+# --------------------------------------------------------------------------- #
+def short_error(e: Exception) -> str:
+    raw = ANSI_RE.sub("", str(e)).replace("ERROR: ", "").strip()
+    return raw.splitlines()[0][:160] if raw else "Bilinmeyen hata"
+
+
+def friendly_error(e: Exception, platform: str) -> str:
+    raw = ANSI_RE.sub("", str(e))
+    low = raw.lower()
+    if "private" in low or "login required" in low or "log in" in low or "giriş" in low:
+        return "İçerik özel veya giriş gerektiriyor, bu yüzden indirilemiyor."
+    if "unavailable" in low or "removed" in low or "not exist" in low or "not available" in low:
+        return "İçerik bulunamadı, silinmiş veya kaldırılmış olabilir."
+    if "no video" in low or "no media" in low or "sadece" in low:
+        return "Bu gönderide indirilebilir bir video bulunamadı."
+    if "403" in low or "forbidden" in low or "blocked" in low:
+        return f"{platform} bu isteği engelledi (403). Biraz sonra tekrar deneyin."
+    if "timed out" in low or "timeout" in low:
+        return "Bağlantı zaman aşımına uğradı, tekrar deneyin."
+    if "429" in low or "rate" in low and "limit" in low:
+        return f"{platform} çok fazla istek nedeniyle geçici olarak sınırladı, biraz sonra tekrar deneyin."
+    if "login required" in low or "rate-limit reached or login" in low:
+        return (f"{platform} artık bu içerik için giriş yapılmış bir hesap istiyor. Sunucuya "
+                f"IG_COOKIES_B64 ortam değişkeni eklenmesi gerekiyor (yedek bir hesapla).")
+    return f"{platform} hatası: {short_error(e)}"
+
+
+def final_error(errors: list, platform: str) -> Exception:
+    """Birden çok denemenin en açıklayıcı hatasını seçer."""
+    return errors[0] if errors else RuntimeError("Bilinmeyen hata")
