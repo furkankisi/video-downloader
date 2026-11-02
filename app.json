@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "BitSaver Pro",
+    "slug": "video-downloader",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "bitsaver",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0518"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.furkankisi.bitsaverpro"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#0A0518"
+      },
+      "package": "com.furkankisi.bitsaverpro",
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_MEDIA_LOCATION"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow BitSaver Pro to access your photos to save downloaded videos.",
+          "savePhotosPermission": "Allow BitSaver Pro to save videos to your gallery.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-8754966775877680~2878129487",
+          "iosAppId": "ca-app-pub-8754966775877680~2878129487",
+          "userTrackingUsageDescription": "Bu izin, size daha uygun ve kişiselleştirilmiş reklamlar gösterebilmemiz için gereklidir."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "KENDI_EXPO_PROJECT_ID_BURAYA_YAZILACAK"
+      }
+    }
+  }
+}
