@@ -1,22 +1,22 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  ActivityIndicator,
-  Image,
-  ScrollView,
-} from 'react-native';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 import AdBanner from '../components/AdBanner';
 import { createRewardedDownloadAd } from '../components/RewardedDownloadAd';
@@ -431,8 +431,8 @@ export default function App() {
         return;
       }
 
-      const MediaLibrary: typeof import('expo-media-library') =
-        require('expo-media-library');
+      const MediaLibrary: typeof import('expo-media-library/legacy') =
+        require('expo-media-library/legacy');
 
       const permission =
         await MediaLibrary.requestPermissionsAsync(true);
